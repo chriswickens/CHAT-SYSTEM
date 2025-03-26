@@ -14,8 +14,8 @@
 #define MAX_MESSAGE_SIZE 80
 
 // Global array to keep track of connected client sockets.
-int client_sockets[MAX_CLIENTS];
-// Mutex to protect access to client_sockets.
+int clientSocketList[MAX_CLIENTS];
+// Mutex to protect access to clientSocketList.
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Function prototypes
@@ -29,9 +29,9 @@ int main()
 {
     int listeningSocket = initializeListener();
 
-    // Initialize the global client_sockets array.
+    // Initialize the global clientSocketList array.
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        client_sockets[i] = -1;
+        clientSocketList[i] = -1;
     }
 
     printf("Server listening on port %d\n", PORT);
@@ -98,13 +98,16 @@ void acceptConnection(int listenSocket)
     }
 
     // Add the new client socket to the global list.
+
+    // Grab the mutex for clients that are connecting to add them to the client list
     pthread_mutex_lock(&clients_mutex);
+
     int added = 0;
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
-        if (client_sockets[i] == -1)
+        if (clientSocketList[i] == -1)
         {
-            client_sockets[i] = clientSocket;
+            clientSocketList[i] = clientSocket;
             added = 1;
             break;
         }
@@ -136,9 +139,9 @@ void acceptConnection(int listenSocket)
         // Remove the client from the global list.
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
-            if (client_sockets[i] == clientSocket)
+            if (clientSocketList[i] == clientSocket)
             {
-                client_sockets[i] = -1;
+                clientSocketList[i] = -1;
                 break;
             }
         }
@@ -162,9 +165,9 @@ void broadcastChatMessage(char *messageToBroadcast)
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
-        if (client_sockets[i] != -1)
+        if (clientSocketList[i] != -1)
         {
-            int sent = send(client_sockets[i], combinedMessage, strlen(combinedMessage), 0);
+            int sent = send(clientSocketList[i], combinedMessage, strlen(combinedMessage), 0);
             if (sent < 0)
             {
                 perror("DEBUG broadcastChatMessage: send failed");
@@ -222,9 +225,9 @@ void *client_handler(void *arg)
     pthread_mutex_lock(&clients_mutex);
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
-        if (client_sockets[i] == client_socket)
+        if (clientSocketList[i] == client_socket)
         {
-            client_sockets[i] = -1;
+            clientSocketList[i] = -1;
             break;
         }
     }
