@@ -33,7 +33,7 @@ int main()
     getmaxyx(stdscr, height, width);
 
     // Create two windows:
-    // 1. msg_win for messages (upper portion)
+    // 1. messageWindow for messages (upper portion)
     // 2. userInputWindow for user input (bottom 3 lines)
     int messageWindowHeight = height - 3;
     int userInputWindowHeight = 3;
