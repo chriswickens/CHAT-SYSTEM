@@ -1,21 +1,21 @@
-CC = cc
-CFLAGS = -Wall -Iinc -I../Common/inc
-LDFLAGS = -lncurses
+# Name of the executable
+programName = chat-client
 
-SRC = src/client.c
-OBJ = obj/client.o
-BIN = bin/chat-client
+# Default target: build the executable
+all: bin/$(programName)
 
-all: $(BIN)
-
-$(BIN): $(OBJ)
+# Link object file to create executable and set its permissions
+bin/$(programName): obj/chat-client.o
 	@mkdir -p bin
-	$(CC) $(OBJ) -o $(BIN) $(LDFLAGS)
+	cc obj/chat-client.o -o bin/$(programName) -lncurses
+	chmod 771 bin/$(programName)
 
-obj/%.o: src/%.c
+# Compile source file into object file; depends on header file
+obj/chat-client.o: src/chat-client.c inc/chat-client.h
 	@mkdir -p obj
-	$(CC) $(CFLAGS) -c $< -o $@
+	cc -c src/chat-client.c -o obj/chat-client.o
 
+# Clean up object file and executable
 clean:
-	rm -f obj/*.o $(BIN)
-
+	rm -f obj/*.o
+	rm -f bin/$(programName)
