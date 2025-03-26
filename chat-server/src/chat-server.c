@@ -13,6 +13,8 @@ client 1: MESSAGE THAT IS OVER 40 CHAR PART 1
 client 2: HELLO!
 client 1: THE REST OF THE MESSAGE!
 
+
+Check the test cases to ensure edge cases are accounted for
 */
 
 
