@@ -17,8 +17,6 @@ client 1: THE REST OF THE MESSAGE!
 Check the test cases to ensure edge cases are accounted for
 */
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +30,8 @@ Check the test cases to ensure edge cases are accounted for
 
 #define PORT 8888
 #define MAX_CLIENTS 10
+
+// Can be in common.h
 #define MAX_MESSAGE_SIZE 80
 
 // Global array to keep track of connected client sockets.
@@ -145,7 +145,7 @@ void acceptConnection(int listenSocket)
     }
 
     // Create a new thread for the client trying to connect
-    pthread_t tid;
+    pthread_t threadId;
 
     // Allocate space for the size of an int for the client socket
     int *clientSocketPointer = malloc(sizeof(int));
@@ -160,7 +160,7 @@ void acceptConnection(int listenSocket)
     // Assign the pointer the socket for the client
     *clientSocketPointer = clientSocket;
 
-    if (pthread_create(&tid, NULL, clientHandler, clientSocketPointer) != 0)
+    if (pthread_create(&threadId, NULL, clientHandler, clientSocketPointer) != 0)
     {
         perror("pthread_create failed");
         free(clientSocketPointer);
@@ -179,7 +179,7 @@ void acceptConnection(int listenSocket)
         return;
     }
     // Detach the thread so resources are freed on exit.
-    pthread_detach(tid);
+    pthread_detach(threadId);
 
     printf("DEBUG acceptConnection: New connection, fd: %d\n", clientSocket);
 }
@@ -259,7 +259,7 @@ void *clientHandler(void *clientSocketPointer)
     {
         if (clientSocketList[i] == clientSocket)
         {
-            // 
+            //
             clientSocketList[i] = -1;
             break;
         }

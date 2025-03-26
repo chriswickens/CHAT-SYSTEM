@@ -4,8 +4,10 @@ xfce4-terminal --geometry=80x24+0+0 --command="make clean"
 
 xfce4-terminal --geometry=80x24+0+0 --command="make"
 sleep 2
+
 # Launch the server terminal at position (0,0)
 xfce4-terminal --geometry=80x24+0+0 --command="./chat-server/bin/chat-server" &
+
 sleep 2
 # Launch the client terminal shifted to the right (e.g., 800 pixels)
 xfce4-terminal --geometry=80x24+800+0 --command="./chat-client/bin/chat-client" &

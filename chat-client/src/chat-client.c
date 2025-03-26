@@ -11,6 +11,8 @@
 
 #define SERVER_PORT 8888
 #define BUFFER_SIZE 1024
+
+// Can be in common.h
 #define MAX_MESSAGE_SIZE 80
 
 int main()
@@ -24,6 +26,8 @@ int main()
     initscr();
     cbreak();
     noecho();
+
+
     // We dont need the keypad enabled?
     // keypad(stdscr, TRUE);
 
@@ -134,14 +138,15 @@ int main()
         if (ch != ERR)
         {
             if (ch == '\n')
-            { // When Enter is pressed.
+            {
+                // When Enter is pressed.
                 if (input_index > 0)
                 {
                     // Send the message to the server.
                     write(socketFileDescriptor, sendBuffer, input_index);
                     wprintw(messageWindow, "Sent: %s\n", sendBuffer);
                     wrefresh(messageWindow);
-                    
+
                     // Clear the send buffer and the input area.
                     memset(sendBuffer, 0, MAX_MESSAGE_SIZE);
                     input_index = 0;
@@ -175,6 +180,7 @@ int main()
                 {
                     sendBuffer[input_index++] = ch;
                     sendBuffer[input_index] = '\0';
+
                     // Update the input window with the new character.
                     werase(userInputWindow);
                     box(userInputWindow, 0, 0);
