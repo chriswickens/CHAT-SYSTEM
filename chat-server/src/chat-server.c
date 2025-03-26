@@ -16,21 +16,22 @@
 // Global array to keep track of connected client sockets.
 int clientSocketList[MAX_CLIENTS];
 // Mutex to protect access to clientSocketList.
-pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t clientMutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Function prototypes
 int initializeListener();
 void acceptConnection(int listeningSocket);
 void broadcastChatMessage(char *messageToBroadcast);
-void processClientMessage(int client_socket);
-void *client_handler(void *arg);
+void processClientMessage(int clientSocket);
+void *clientHandler(void *clientSocketPointer);
 
 int main()
 {
     int listeningSocket = initializeListener();
 
     // Initialize the global clientSocketList array.
-    for (int i = 0; i < MAX_CLIENTS; i++) {
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
         clientSocketList[i] = -1;
     }
 
@@ -89,8 +90,8 @@ int initializeListener()
 void acceptConnection(int listenSocket)
 {
     struct sockaddr_in clientAddress;
-    socklen_t clientAddrLen = sizeof(clientAddress);
-    int clientSocket = accept(listenSocket, (struct sockaddr *)&clientAddress, &clientAddrLen);
+    socklen_t clientAddressLength = sizeof(clientAddress);
+    int clientSocket = accept(listenSocket, (struct sockaddr *)&clientAddress, &clientAddressLength);
     if (clientSocket < 0)
     {
         perror("accept connection failed");
@@ -100,42 +101,50 @@ void acceptConnection(int listenSocket)
     // Add the new client socket to the global list.
 
     // Grab the mutex for clients that are connecting to add them to the client list
-    pthread_mutex_lock(&clients_mutex);
+    pthread_mutex_lock(&clientMutex);
 
-    int added = 0;
+    // Used to check if the client was successfully added to the list of clients
+    int wasClientAdded = 0;
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         if (clientSocketList[i] == -1)
         {
             clientSocketList[i] = clientSocket;
-            added = 1;
+            wasClientAdded = 1;
             break;
         }
     }
-    pthread_mutex_unlock(&clients_mutex);
+    pthread_mutex_unlock(&clientMutex);
 
-    if (!added)
+    if (!wasClientAdded)
     {
         printf("DEBUG acceptConnection: Maximum clients reached. Rejecting connection.\n");
         close(clientSocket);
         return;
     }
 
-    // Create a new thread to handle this client.
+    // Create a new thread for the client trying to connect
     pthread_t tid;
-    int *pclient = malloc(sizeof(int));
-    if (pclient == NULL) {
+
+    // Allocate space for the size of an int for the client socket
+    int *clientSocketPointer = malloc(sizeof(int));
+
+    if (clientSocketPointer == NULL)
+    {
         perror("malloc failed");
         close(clientSocket);
         return;
     }
-    *pclient = clientSocket;
-    if (pthread_create(&tid, NULL, client_handler, pclient) != 0)
+
+    // Assign the pointer the socket for the client
+    *clientSocketPointer = clientSocket;
+
+    if (pthread_create(&tid, NULL, clientHandler, clientSocketPointer) != 0)
     {
         perror("pthread_create failed");
-        free(pclient);
+        free(clientSocketPointer);
         close(clientSocket);
-        pthread_mutex_lock(&clients_mutex);
+        pthread_mutex_lock(&clientMutex);
         // Remove the client from the global list.
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
@@ -145,7 +154,7 @@ void acceptConnection(int listenSocket)
                 break;
             }
         }
-        pthread_mutex_unlock(&clients_mutex);
+        pthread_mutex_unlock(&clientMutex);
         return;
     }
     // Detach the thread so resources are freed on exit.
@@ -162,47 +171,49 @@ void broadcastChatMessage(char *messageToBroadcast)
     char combinedMessage[MAX_MESSAGE_SIZE + sizeof(userName) + 3]; // username, ": ", message, null terminator
     snprintf(combinedMessage, sizeof(combinedMessage), "%s: %s", userName, messageToBroadcast);
 
-    pthread_mutex_lock(&clients_mutex);
+    // Grab the mutex to check the list of clients and send the message to any clients currently connected
+    pthread_mutex_lock(&clientMutex);
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         if (clientSocketList[i] != -1)
         {
-            int sent = send(clientSocketList[i], combinedMessage, strlen(combinedMessage), 0);
-            if (sent < 0)
+            int sendMessageResult = send(clientSocketList[i], combinedMessage, strlen(combinedMessage), 0);
+            if (sendMessageResult < 0)
             {
                 perror("DEBUG broadcastChatMessage: send failed");
             }
         }
     }
-    pthread_mutex_unlock(&clients_mutex);
+    pthread_mutex_unlock(&clientMutex);
 }
 
 // Processes messages from a single client. This function runs in a dedicated thread.
-void processClientMessage(int client_socket)
+void processClientMessage(int clientSocket)
 {
-    char buffer[MAX_MESSAGE_SIZE];
+    char incomingMessage[MAX_MESSAGE_SIZE];
+
     while (1)
     {
-        int numberOfBytesRead = read(client_socket, buffer, MAX_MESSAGE_SIZE - 1);
+        int numberOfBytesRead = read(clientSocket, incomingMessage, MAX_MESSAGE_SIZE - 1);
         if (numberOfBytesRead > 0)
         {
-            buffer[numberOfBytesRead] = '\0'; // Null-terminate the string.
+            incomingMessage[numberOfBytesRead] = '\0'; // Null-terminate the string.
 
             // If the client sends "quit", disconnect.
-            if (strcmp(buffer, "quit") == 0)
+            if (strcmp(incomingMessage, "quit") == 0)
             {
-                printf("DEBUG processClientMessage: Client on fd %d requested disconnect.\n", client_socket);
+                printf("DEBUG processClientMessage: Client on fd %d requested disconnect.\n", clientSocket);
                 break;
             }
             else
             {
-                broadcastChatMessage(buffer);
+                broadcastChatMessage(incomingMessage);
             }
         }
         else if (numberOfBytesRead == 0)
         {
             // Client disconnected.
-            printf("Client on fd %d disconnected.\n", client_socket);
+            printf("Client on fd %d disconnected.\n", clientSocket);
             break;
         }
         else
@@ -214,25 +225,26 @@ void processClientMessage(int client_socket)
 }
 
 // Thread function for handling a client's messages.
-void *client_handler(void *arg)
+void *clientHandler(void *clientSocketPointer)
 {
-    int client_socket = *(int *)arg;
-    free(arg);
+    int clientSocket = *(int *)clientSocketPointer;
+    free(clientSocketPointer);
 
-    processClientMessage(client_socket);
+    processClientMessage(clientSocket);
 
     // Remove the client from the global list.
-    pthread_mutex_lock(&clients_mutex);
+    pthread_mutex_lock(&clientMutex);
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
-        if (clientSocketList[i] == client_socket)
+        if (clientSocketList[i] == clientSocket)
         {
+            // 
             clientSocketList[i] = -1;
             break;
         }
     }
-    pthread_mutex_unlock(&clients_mutex);
+    pthread_mutex_unlock(&clientMutex);
 
-    close(client_socket);
+    close(clientSocket);
     return NULL;
 }

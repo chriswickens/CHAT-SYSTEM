@@ -129,6 +129,8 @@ int main()
 
         // Check for user input from the input window.
         ch = wgetch(userInputWindow);
+
+        // If the result of the input is not an error (invalid entry)
         if (ch != ERR)
         {
             if (ch == '\n')
@@ -165,6 +167,7 @@ int main()
             //         wrefresh(userInputWindow);
             //     }
             // }
+
             else
             {
                 if (input_index < MAX_MESSAGE_SIZE - 1)
