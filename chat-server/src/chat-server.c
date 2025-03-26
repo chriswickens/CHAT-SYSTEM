@@ -1,3 +1,22 @@
+/*
+
+Things to do: Work on the protocol for both the client and the server
+Protocol files in COMMON for server and client to have access to it
+Functions in the protocol for client and server parsing
+
+The client will need to determine if the message is from itself and change the << symbols
+
+Client will parcel up messages AFTER they press enter - regardless of the message being over 40 characters
+This will help prevent the server from doing this:
+
+client 1: MESSAGE THAT IS OVER 40 CHAR PART 1
+client 2: HELLO!
+client 1: THE REST OF THE MESSAGE!
+
+*/
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

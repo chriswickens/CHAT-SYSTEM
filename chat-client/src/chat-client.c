@@ -141,6 +141,7 @@ int main()
                     write(socketFileDescriptor, sendBuffer, input_index);
                     wprintw(messageWindow, "Sent: %s\n", sendBuffer);
                     wrefresh(messageWindow);
+                    
                     // Clear the send buffer and the input area.
                     memset(sendBuffer, 0, MAX_MESSAGE_SIZE);
                     input_index = 0;
@@ -183,7 +184,8 @@ int main()
                 }
             }
         }
-        usleep(10000); // Brief sleep to reduce CPU usage.
+
+        // usleep(10000); // Brief sleep to reduce CPU usage.
     }
 
     // Cleanup (this code is unreachable in the loop above, but included for completeness).
