@@ -1,0 +1,9 @@
+#!/bin/bash
+echo "Running client AND server side by side..."
+
+# Launch the server terminal at position (0,0)
+xfce4-terminal --geometry=80x24+0+0 --command="./chat-server/bin/chat-server" &
+
+# Launch the client terminal shifted to the right (e.g., 800 pixels)
+xfce4-terminal --geometry=80x24+800+0 --command="./chat-client/bin/chat-client" &
+
