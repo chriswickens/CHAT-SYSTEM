@@ -153,6 +153,7 @@ int startReceivingThread()
 void handleUserInput()
 {
     char sendBuffer[MAX_MESSAGE_SIZE] = {0};
+    char clientProtocol[65] = {0};
     int userInputIndex = 0;    // For tracking WHERE to put the character the user types in the sendBuffer
     int currentCharacterAscii; // Storage for the current character ascii value, or error return from wgetch()
 
@@ -229,6 +230,7 @@ int main(int argc, char *argv[])
     char userName[6];
     strcpy(serverIP, argv[2] + 7); // + 7 to start parsing after the -server
     strcpy(userName, argv[1] + 5); // + 5 to start parsing after the -client
+
     // Call the function to initialize the ncurses interfaces
     initializeNcursesWindows();
 
