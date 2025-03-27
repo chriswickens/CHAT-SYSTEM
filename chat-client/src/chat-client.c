@@ -18,7 +18,7 @@ char receiveBuffer[MAX_MESSAGE_SIZE];    // Buffer for incoming messages
 // Function prototypes
 void initializeNcursesWindows(void);
 int connectToServer(const char *ip);
-void *handleReceivedMessage(void *arg);
+void *handleReceivedMessage();
 int startReceivingThread(void);
 void handleUserInput(void);
 void cleanup(void);
@@ -76,9 +76,8 @@ int connectToServer(const char *ip)
  * Thread function: blocks on read() to receive messages from server.
  * Prints incoming text to messageWindow until connection closes or error occurs.
  */
-void *handleReceivedMessage(void *arg)
+void *handleReceivedMessage()
 {
-    (void)arg;
     while (1)
     {
         ssize_t n = read(socketFileDescriptor, receiveBuffer, MAX_MESSAGE_SIZE - 1);
@@ -115,7 +114,10 @@ int startReceivingThread()
 {
     pthread_t recvThread;
     if (pthread_create(&recvThread, NULL, handleReceivedMessage, NULL) != 0)
+    {
         return -1;
+    }
+
     pthread_detach(recvThread);
     return 0;
 }
