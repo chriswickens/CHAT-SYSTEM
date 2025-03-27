@@ -32,7 +32,7 @@ Check the test cases to ensure edge cases are accounted for
 #define MAX_CLIENTS 10
 
 // Can be in common.h
-#define MAX_MESSAGE_SIZE 80
+#define MAX_MESSAGE_SIZE 81
 
 // Global array to keep track of connected client sockets.
 int clientSocketList[MAX_CLIENTS];
@@ -232,7 +232,7 @@ void processClientMessage(int clientSocket)
             // back to the client and split it up into two separate messages including the protocol needed for the client
 
             // This will probably need to be +1 to properly null terminate the ACTUAL message!
-            incomingMessage[numberOfBytesRead + 1] = '\0'; // Null-terminate the string.
+            incomingMessage[numberOfBytesRead] = '\0'; // Null-terminate the string.
 
             // If the client sends "quit", disconnect.
             if (strcmp(incomingMessage, ">>bye<<") == 0)

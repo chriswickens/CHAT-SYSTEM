@@ -9,7 +9,7 @@
 #include <pthread.h>
 
 #define SERVER_PORT 8888    // Port number of chat server
-#define MAX_MESSAGE_SIZE 80 // Maximum length of a chat message
+#define MAX_MESSAGE_SIZE 81 // Maximum length of a chat message
 
 int socketFileDescriptor;                // Global socket descriptor
 WINDOW *messageWindow, *userInputWindow; // ncurses windows for chat display and input
@@ -70,7 +70,6 @@ int connectToServer(const char *serverIpAddress)
     // Use port from SERVER_PORT
     serverAddress.sin_port = htons(SERVER_PORT);
 
-
     inet_pton(AF_INET, serverIpAddress, &serverAddress.sin_addr);
 
     if (connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
@@ -89,12 +88,18 @@ void *handleReceivedMessage()
 {
     while (1)
     {
-        //
-        ssize_t numberOfBytesRead = read(socketFileDescriptor, receiveBuffer, MAX_MESSAGE_SIZE - 1);
+        // This MAX_MESSAGE_SIZE will need to be changed to a max LINE size
+        // To account for the protocol characters AND the message itself
+        ssize_t numberOfBytesRead = read(socketFileDescriptor, receiveBuffer, MAX_MESSAGE_SIZE + 16);
+
         if (numberOfBytesRead > 0)
         {
             // The buffer to store the string read from the socket
             receiveBuffer[numberOfBytesRead] = '\0';
+
+            // Parse out the message from the raw protocol message, then
+            // snprintf the message together with the extracted user name
+            // and ip address and concatenate the date to the end of the message to display it
 
             // Get readt to print the buffer to the message window in ncurses
             wprintw(messageWindow, "%s\n", receiveBuffer);
@@ -168,8 +173,8 @@ void handleUserInput()
         {
             // Send when Enter pressed
             write(socketFileDescriptor, sendBuffer, userInputIndex);
-            wprintw(messageWindow, "CLIENT SIDE DEBUG: Sent: %s\n", sendBuffer);
-            wrefresh(messageWindow);
+            // wprintw(messageWindow, "CLIENT SIDE DEBUG: Sent: %s\n", sendBuffer);
+            // wrefresh(messageWindow);
             memset(sendBuffer, 0, sizeof(sendBuffer));
             userInputIndex = 0;
             werase(userInputWindow);
@@ -190,8 +195,8 @@ void handleUserInput()
                 sendBuffer[userInputIndex] = '\0'; // Put a null terminator at the end!
 
                 // Erase the input window after the input is stored in the buffer
-                
-                // This is how the terminal display 
+
+                // This is how the terminal display
                 // werase(userInputWindow);
                 box(userInputWindow, 0, 0);
                 mvwprintw(userInputWindow, 1, 1, "> %s", sendBuffer);
