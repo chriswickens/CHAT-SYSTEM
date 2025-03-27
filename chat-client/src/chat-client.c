@@ -7,6 +7,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <netdb.h>
+#include <netinet/in.h>
 
 #define SERVER_PORT 8888    // Port number of chat server
 #define MAX_MESSAGE_SIZE 81 // Maximum length of a chat message
@@ -20,7 +22,7 @@ void initializeNcursesWindows(void);
 int connectToServer(const char *serverIpAddress);
 void *handleReceivedMessage();
 int startReceivingThread(void);
-void handleUserInput(void);
+void handleUserInput(char* userName, char* clientIP);
 void cleanup(void);
 
 /**
@@ -150,9 +152,11 @@ int startReceivingThread()
  * Main input loop: reads keystrokes, builds a message buffer,
  * sends complete lines to server on Enter, and updates UI.
  */
-void handleUserInput()
+void handleUserInput(char* userName, char* clientIP)
 {
     char sendBuffer[MAX_MESSAGE_SIZE] = {0};
+    char clientProtocol[65] = {0};
+
     int userInputIndex = 0;    // For tracking WHERE to put the character the user types in the sendBuffer
     int currentCharacterAscii; // Storage for the current character ascii value, or error return from wgetch()
 
@@ -171,11 +175,28 @@ void handleUserInput()
         // If the user pressed enter and the input is GREATER than 0 (the user typed a character)
         if (currentCharacterAscii == '\n' && userInputIndex > 0)
         {
+            //Prep protocol with IP and Name
+            strcat(clientProtocol, clientIP);
+            strcat(clientProtocol, "|");
+            strcat(clientProtocol, userName);
+            strcat(clientProtocol, "|");
+            strcat(clientProtocol, "0");
+            strcat(clientProtocol, "|");
+
+
             // Send when Enter pressed
-            write(socketFileDescriptor, sendBuffer, userInputIndex);
+            strcat(clientProtocol, sendBuffer);
+
+
+            wprintw(messageWindow, "%s\n", clientProtocol);
+
+
+            //write(socketFileDescriptor, sendBuffer, userInputIndex);
+            write(socketFileDescriptor, clientProtocol, userInputIndex);
             // wprintw(messageWindow, "CLIENT SIDE DEBUG: Sent: %s\n", sendBuffer);
             // wrefresh(messageWindow);
             memset(sendBuffer, 0, sizeof(sendBuffer));
+            memset(clientProtocol, 0, sizeof(clientProtocol));
             userInputIndex = 0;
             werase(userInputWindow);
             box(userInputWindow, 0, 0);
@@ -223,12 +244,48 @@ void cleanup()
     endwin();
 }
 
+
+void check_host_name(int hostname) { //This function returns host name for local computer
+    if (hostname == -1) {
+       perror("gethostname");
+       exit(1);
+    }
+ }
+ void check_host_entry(struct hostent * hostentry) { //find host info from host name
+    if (hostentry == NULL){
+       perror("gethostbyname");
+       exit(1);
+    }
+ }
+ void IP_formatter(char *IPbuffer) { //convert IP string to dotted decimal format
+    if (NULL == IPbuffer) {
+       perror("inet_ntoa");
+       exit(1);
+    }
+ }
+
+
 int main(int argc, char *argv[])
 {
+    char host[256];
+    char *clientIP;
+    struct hostent *host_entry;
+    int hostname;
+    hostname = gethostname(host, sizeof(host)); //find the host name
+    check_host_name(hostname);
+    host_entry = gethostbyname(host); //find host information
+    check_host_entry(host_entry);
+    clientIP = inet_ntoa(*((struct in_addr*) host_entry->h_addr_list[0])); //Convert into IP string
+
+    printf("Current Host Name: %s\n", host);
+    printf("Host IP: %s\n", clientIP);
+
+
     char serverIP[15];
     char userName[6];
     strcpy(serverIP, argv[2] + 7); // + 7 to start parsing after the -server
     strcpy(userName, argv[1] + 5); // + 5 to start parsing after the -client
+
     // Call the function to initialize the ncurses interfaces
     initializeNcursesWindows();
 
@@ -251,7 +308,7 @@ int main(int argc, char *argv[])
     startReceivingThread();
 
     // Start the function to get input from the user
-    handleUserInput();
+    handleUserInput(userName, clientIP);
 
     // Clean up AFTER everything has stopped!
     cleanup();
