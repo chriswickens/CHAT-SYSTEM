@@ -115,7 +115,7 @@ void acceptConnection(int listenSocket)
     int clientSocket = accept(listenSocket, (struct sockaddr *)&clientAddress, &clientAddressLength);
     if (clientSocket < 0)
     {
-        perror("accept connection failed");
+        perror("accept connection failed"); 
         return;
     }
 
