@@ -234,41 +234,43 @@ void processClientMessage(int clientSocket)
             // This will probably need to be +1 to properly null terminate the ACTUAL message!
             incomingMessage[numberOfBytesRead] = '\0'; // Null-terminate the string.
 
-           
-
             char incomingProtocol[MAX_MESSAGE_SIZE] = "100.100.100|KyleM|0|Hello World!";
             printf("Server stuff!\n\n");
             // Split protocol message into vars with strtok
-            char* token;
-            char* ip;
+            char *token;
+            char *ip;
             token = strtok(incomingProtocol, "|");
-            if (ip == NULL){
+            if (ip == NULL)
+            {
                 printf("Error parsing ip with strtok!\n");
                 exit(-1);
             }
             ip = token;
 
-            char* username;
+            char *username;
             username = strtok(NULL, "|");
-            if (username == NULL){
+            if (username == NULL)
+            {
                 printf("Error parsing username with strtok!\n");
                 exit(-1);
             }
 
-            char* bit;
+            char *bit;
             bit = strtok(NULL, "|");
-            if (bit == NULL){
+            if (bit == NULL)
+            {
                 printf("Error parsing bit with strtok!\n");
                 exit(-1);
             }
 
-            char* message;
+            char *message;
             message = strtok(NULL, "|");
-            if (message == NULL){
+            if (message == NULL)
+            {
                 printf("Error parsing message with strtok!\n");
                 exit(-1);
             }
-            
+
             printf("Ip: %s\n", ip);
             printf("Hello!\n");
             printf("Username: %s\n", username);
