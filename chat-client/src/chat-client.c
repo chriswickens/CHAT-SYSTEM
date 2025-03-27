@@ -3,201 +3,201 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <poll.h>
+#include <pthread.h>
 
-#define SERVER_PORT 8888
-#define BUFFER_SIZE 1024
+#define SERVER_PORT 8888    // Port number of chat server
+#define MAX_MESSAGE_SIZE 80 // Maximum length of a chat message
 
-// Can be in common.h
-#define MAX_MESSAGE_SIZE 80
+int socketFileDescriptor;                // Global socket descriptor
+WINDOW *messageWindow, *userInputWindow; // ncurses windows for chat display and input
+char receiveBuffer[MAX_MESSAGE_SIZE];    // Buffer for incoming messages
 
-int main()
+// Function prototypes
+void initializeNcursesWindows(void);
+int connectToServer(const char *ip);
+void *handleReceivedMessage(void *arg);
+int startReceivingThread(void);
+void handleUserInput(void);
+void cleanup(void);
+
+/**
+ * Initialize ncurses, create windows for messages and user input,
+ * enable scrolling on message window, and set input to non-blocking.
+ */
+void initializeNcursesWindows()
 {
-    int socketFileDescriptor;
-    struct sockaddr_in serverAddress;
-    char sendBuffer[MAX_MESSAGE_SIZE] = {0};
-    char receiveBuffer[MAX_MESSAGE_SIZE] = {0};
-
-    // Initialize ncurses.
-    initscr();
-    cbreak();
-    noecho();
-
-
-    // We dont need the keypad enabled?
-    // keypad(stdscr, TRUE);
-
-    // Set getch() non-blocking on our input window later.
+    initscr(); // Start ncurses mode
+    cbreak();  // Disable line buffering
+    noecho();  // Don't echo typed characters
 
     int height, width;
     getmaxyx(stdscr, height, width);
 
-    // Create two windows:
-    // 1. messageWindow for messages (upper portion)
-    // 2. userInputWindow for user input (bottom 3 lines)
-    int messageWindowHeight = height - 3;
-    int userInputWindowHeight = 3;
-    WINDOW *messageWindow = newwin(messageWindowHeight, width, 0, 0);
-    WINDOW *userInputWindow = newwin(userInputWindowHeight, width, messageWindowHeight, 0);
+    messageWindow = newwin(height - 3, width, 0, 0);
+    userInputWindow = newwin(3, width, height - 3, 0);
+    scrollok(messageWindow, TRUE); // Allow scrolling when new text is added
 
-    scrollok(messageWindow, TRUE);
-    box(userInputWindow, 0, 0);
+    box(userInputWindow, 0, 0);             // Draw border around input window
+    mvwprintw(userInputWindow, 1, 1, "> "); // Print prompt
+    wmove(userInputWindow, 1, 3);
     wrefresh(messageWindow);
     wrefresh(userInputWindow);
+    nodelay(userInputWindow, TRUE); // Make wgetch non-blocking
+}
 
-    // Create a socket.
+/**
+ * Create a TCP socket and connect to the specified IP on SERVER_PORT.
+ * Returns 0 on success, -1 on failure.
+ */
+int connectToServer(const char *ip)
+{
+    struct sockaddr_in serverAddress;
     socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
     if (socketFileDescriptor < 0)
-    {
-        wprintw(messageWindow, "Error creating socket\n");
-        wrefresh(messageWindow);
-        endwin();
-        exit(EXIT_FAILURE);
-    }
+        return -1;
 
-    // Set the socket to non-blocking.
-    int flags = fcntl(socketFileDescriptor, F_GETFL, 0);
-    if (flags < 0)
-    {
-        wprintw(messageWindow, "fcntl F_GETFL error\n");
-        wrefresh(messageWindow);
-        endwin();
-        exit(EXIT_FAILURE);
-    }
-    fcntl(socketFileDescriptor, F_SETFL, flags | O_NONBLOCK);
-
-    // Prepare server address.
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(SERVER_PORT);
-    if (inet_pton(AF_INET, "127.0.0.1", &serverAddress.sin_addr) <= 0)
+    inet_pton(AF_INET, ip, &serverAddress.sin_addr);
+
+    if (connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
-        wprintw(messageWindow, "Invalid address/ Address not supported\n");
-        wrefresh(messageWindow);
-        endwin();
-        exit(EXIT_FAILURE);
+        close(socketFileDescriptor);
+        return -1;
     }
+    return 0;
+}
 
-    // Connect (non-blocking connect may return EINPROGRESS).
-    int res = connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress));
-    if (res < 0 && errno != EINPROGRESS)
-    {
-        wprintw(messageWindow, "Connect failed\n");
-        wrefresh(messageWindow);
-        endwin();
-        exit(EXIT_FAILURE);
-    }
-
-    // Set up pollfd for the socket.
-    struct pollfd pfds[1];
-    pfds[0].fd = socketFileDescriptor;
-    pfds[0].events = POLLIN; // watch for incoming data
-
-    // Display initial messages.
-    wprintw(messageWindow, "Connected to server.\n");
-    wprintw(messageWindow, "Chat messages will appear here.\n");
-    wrefresh(messageWindow);
-
-    // Set userInputWindow to non-blocking.
-    nodelay(userInputWindow, TRUE);
-
-    // Print prompt in userInputWindow.
-    mvwprintw(userInputWindow, 1, 1, "> ");
-    wmove(userInputWindow, 1, 3);
-    wrefresh(userInputWindow);
-
-    int input_index = 0;
-    int ch;
+/**
+ * Thread function: blocks on read() to receive messages from server.
+ * Prints incoming text to messageWindow until connection closes or error occurs.
+ */
+void *handleReceivedMessage(void *arg)
+{
+    (void)arg;
     while (1)
     {
-        // Poll for incoming messages on the socket.
-        int poll_res = poll(pfds, 1, 100); // 100ms timeout
-        if (poll_res > 0)
+        ssize_t n = read(socketFileDescriptor, receiveBuffer, MAX_MESSAGE_SIZE - 1);
+        if (n > 0)
         {
-            if (pfds[0].revents & POLLIN)
-            {
-                int n = read(socketFileDescriptor, receiveBuffer, MAX_MESSAGE_SIZE - 1);
-                if (n > 0)
-                {
-                    receiveBuffer[n] = '\0';
-                    // Display received message in the message window.
-                    wprintw(messageWindow, "Received: %s\n", receiveBuffer);
-                    wrefresh(messageWindow);
-                }
-            }
+            receiveBuffer[n] = '\0';
+            wprintw(messageWindow, "%s\n", receiveBuffer);
+            wrefresh(messageWindow);
         }
-
-        // Check for user input from the input window.
-        ch = wgetch(userInputWindow);
-
-        // If the result of the input is not an error (invalid entry)
-        if (ch != ERR)
+        else if (n == 0)
         {
-            if (ch == '\n')
-            {
-                // When Enter is pressed.
-                if (input_index > 0)
-                {
-                    // Send the message to the server.
-                    write(socketFileDescriptor, sendBuffer, input_index);
-                    wprintw(messageWindow, "Sent: %s\n", sendBuffer);
-                    wrefresh(messageWindow);
-
-                    // Clear the send buffer and the input area.
-                    memset(sendBuffer, 0, MAX_MESSAGE_SIZE);
-                    input_index = 0;
-                    werase(userInputWindow);
-                    box(userInputWindow, 0, 0);
-                    mvwprintw(userInputWindow, 1, 1, "> ");
-                    wmove(userInputWindow, 1, 3);
-                    wrefresh(userInputWindow);
-                }
-            }
-
-            // We dont need to worry about backspace
-            // else if (ch == KEY_BACKSPACE || ch == 127)
-            // {
-            //     if (input_index > 0)
-            //     {
-            //         input_index--;
-            //         sendBuffer[input_index] = '\0';
-            //         // Clear and update the input area.
-            //         werase(userInputWindow);
-            //         box(userInputWindow, 0, 0);
-            //         mvwprintw(userInputWindow, 1, 1, "> %s", sendBuffer);
-            //         wmove(userInputWindow, 1, 3 + input_index);
-            //         wrefresh(userInputWindow);
-            //     }
-            // }
-
-            else
-            {
-                if (input_index < MAX_MESSAGE_SIZE - 1)
-                {
-                    sendBuffer[input_index++] = ch;
-                    sendBuffer[input_index] = '\0';
-
-                    // Update the input window with the new character.
-                    werase(userInputWindow);
-                    box(userInputWindow, 0, 0);
-                    mvwprintw(userInputWindow, 1, 1, "> %s", sendBuffer);
-                    wmove(userInputWindow, 1, 3 + input_index);
-                    wrefresh(userInputWindow);
-                }
-            }
+            // Server closed connection
+            wprintw(messageWindow, "Server disconnected.\n");
+            wrefresh(messageWindow);
+            break;
         }
-
-        // usleep(10000); // Brief sleep to reduce CPU usage.
+        else if (errno != EAGAIN && errno != EWOULDBLOCK)
+        {
+            // Unexpected read error
+            wprintw(messageWindow, "Read error: %s\n", strerror(errno));
+            wrefresh(messageWindow);
+            break;
+        }
+        usleep(50000); // Throttle loop to reduce CPU usage
     }
+    return NULL;
+}
 
-    // Cleanup (this code is unreachable in the loop above, but included for completeness).
+/**
+ * Launch the handleReceivedMessage in a detached thread.
+ * Returns 0 on success, -1 on thread creation failure.
+ */
+int startReceivingThread()
+{
+    pthread_t recvThread;
+    if (pthread_create(&recvThread, NULL, handleReceivedMessage, NULL) != 0)
+        return -1;
+    pthread_detach(recvThread);
+    return 0;
+}
+
+/**
+ * Main input loop: reads keystrokes, builds a message buffer,
+ * sends complete lines to server on Enter, and updates UI.
+ */
+void handleUserInput()
+{
+    char sendBuffer[MAX_MESSAGE_SIZE] = {0};
+    int input_index = 0;
+    int ch;
+
+    while (1)
+    {
+        ch = wgetch(userInputWindow);
+        if (ch == ERR)
+        {
+            usleep(50000);
+            continue;
+        }
+        if (ch == '\n' && input_index > 0)
+        {
+            // Send when Enter pressed
+            write(socketFileDescriptor, sendBuffer, input_index);
+            wprintw(messageWindow, "Sent: %s\n", sendBuffer);
+            wrefresh(messageWindow);
+            memset(sendBuffer, 0, sizeof(sendBuffer));
+            input_index = 0;
+            werase(userInputWindow);
+            box(userInputWindow, 0, 0);
+            mvwprintw(userInputWindow, 1, 1, "> ");
+            wmove(userInputWindow, 1, 3);
+            wrefresh(userInputWindow);
+        }
+        else if (ch != '\n')
+        {
+            // Add character to buffer
+            if (input_index < MAX_MESSAGE_SIZE - 1)
+            {
+                sendBuffer[input_index++] = ch;
+                sendBuffer[input_index] = '\0';
+                werase(userInputWindow);
+                box(userInputWindow, 0, 0);
+                mvwprintw(userInputWindow, 1, 1, "> %s", sendBuffer);
+                wmove(userInputWindow, 1, 3 + input_index);
+                wrefresh(userInputWindow);
+            }
+        }
+    }
+}
+
+/**
+ * Close socket, delete ncurses windows, and end ncurses mode.
+ */
+void cleanup()
+{
     close(socketFileDescriptor);
     delwin(messageWindow);
     delwin(userInputWindow);
     endwin();
+}
+
+int main()
+{
+    initializeNcursesWindows();
+
+    if (connectToServer("127.0.0.1") < 0)
+    {
+        wprintw(messageWindow, "Connect failed: %s\n", strerror(errno));
+        wrefresh(messageWindow);
+        cleanup();
+        exit(EXIT_FAILURE);
+    }
+
+    wprintw(messageWindow, "Connected to server.\n");
+    wrefresh(messageWindow);
+
+    startReceivingThread();
+    handleUserInput();
+
+    cleanup();
     return 0;
 }
