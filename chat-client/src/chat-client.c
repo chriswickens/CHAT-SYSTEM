@@ -129,42 +129,52 @@ int startReceivingThread()
 void handleUserInput()
 {
     char sendBuffer[MAX_MESSAGE_SIZE] = {0};
-    int input_index = 0;
-    int ch;
+    int userInputIndex = 0; // For tracking WHERE to put the character the user types in the sendBuffer
+    int currentCharacterAscii; // Storage for the current character ascii value, or error return from wgetch()
 
     while (1)
     {
-        ch = wgetch(userInputWindow);
-        if (ch == ERR)
+        currentCharacterAscii = wgetch(userInputWindow);
+
+        // If there was an error getting a character from the user
+        // Keep getting input
+        if (currentCharacterAscii == ERR)
         {
             usleep(50000);
             continue;
         }
-        if (ch == '\n' && input_index > 0)
+        
+        // If the user pressed enter and the input is GREATER than 0 (the user typed a character)
+        if (currentCharacterAscii == '\n' && userInputIndex > 0)
         {
             // Send when Enter pressed
-            write(socketFileDescriptor, sendBuffer, input_index);
+            write(socketFileDescriptor, sendBuffer, userInputIndex);
             wprintw(messageWindow, "Sent: %s\n", sendBuffer);
             wrefresh(messageWindow);
             memset(sendBuffer, 0, sizeof(sendBuffer));
-            input_index = 0;
+            userInputIndex = 0;
             werase(userInputWindow);
             box(userInputWindow, 0, 0);
             mvwprintw(userInputWindow, 1, 1, "> ");
             wmove(userInputWindow, 1, 3);
             wrefresh(userInputWindow);
         }
-        else if (ch != '\n')
+
+        // If the user enters ANYTHING other than ENTER
+        else if (currentCharacterAscii != '\n')
         {
             // Add character to buffer
-            if (input_index < MAX_MESSAGE_SIZE - 1)
+            if (userInputIndex < MAX_MESSAGE_SIZE - 1)
             {
-                sendBuffer[input_index++] = ch;
-                sendBuffer[input_index] = '\0';
+                // Increment the userInputIndex and add the character to the index location in the char array
+                sendBuffer[userInputIndex++] = currentCharacterAscii;
+                sendBuffer[userInputIndex] = '\0'; // Put a null terminator at the end!
+
+                // Erase the input window after the input is stored in the buffer
                 werase(userInputWindow);
                 box(userInputWindow, 0, 0);
                 mvwprintw(userInputWindow, 1, 1, "> %s", sendBuffer);
-                wmove(userInputWindow, 1, 3 + input_index);
+                wmove(userInputWindow, 1, 3 + userInputIndex);
                 wrefresh(userInputWindow);
             }
         }
