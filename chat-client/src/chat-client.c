@@ -17,7 +17,7 @@ char receiveBuffer[MAX_MESSAGE_SIZE];    // Buffer for incoming messages
 
 // Function prototypes
 void initializeNcursesWindows(void);
-int connectToServer(const char *ip);
+int connectToServer(const char *serverIpAddress);
 void *handleReceivedMessage();
 int startReceivingThread(void);
 void handleUserInput(void);
@@ -52,17 +52,26 @@ void initializeNcursesWindows()
  * Create a TCP socket and connect to the specified IP on SERVER_PORT.
  * Returns 0 on success, -1 on failure.
  */
-int connectToServer(const char *ip)
+int connectToServer(const char *serverIpAddress)
 {
     struct sockaddr_in serverAddress;
     socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
     if (socketFileDescriptor < 0)
+    {
         return -1;
+    }
 
+    // Allocate some memory for the serverAddress socket
     memset(&serverAddress, 0, sizeof(serverAddress));
+
+    // Setup to use IPV4
     serverAddress.sin_family = AF_INET;
+
+    // Use port from SERVER_PORT
     serverAddress.sin_port = htons(SERVER_PORT);
-    inet_pton(AF_INET, ip, &serverAddress.sin_addr);
+
+
+    inet_pton(AF_INET, serverIpAddress, &serverAddress.sin_addr);
 
     if (connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
@@ -80,28 +89,38 @@ void *handleReceivedMessage()
 {
     while (1)
     {
-        ssize_t n = read(socketFileDescriptor, receiveBuffer, MAX_MESSAGE_SIZE - 1);
-        if (n > 0)
+        //
+        ssize_t numberOfBytesRead = read(socketFileDescriptor, receiveBuffer, MAX_MESSAGE_SIZE - 1);
+        if (numberOfBytesRead > 0)
         {
-            receiveBuffer[n] = '\0';
+            // The buffer to store the string read from the socket
+            receiveBuffer[numberOfBytesRead] = '\0';
+
+            // Get readt to print the buffer to the message window in ncurses
             wprintw(messageWindow, "%s\n", receiveBuffer);
+
+            // Refresh the window to display the changes
             wrefresh(messageWindow);
         }
-        else if (n == 0)
+
+        // If the number of bytes read == 0, the server has disconnected
+        else if (numberOfBytesRead == 0)
         {
             // Server closed connection
             wprintw(messageWindow, "Server disconnected.\n");
             wrefresh(messageWindow);
             break;
         }
+
+        // Check for any errors from the socket
         else if (errno != EAGAIN && errno != EWOULDBLOCK)
         {
             // Unexpected read error
-            wprintw(messageWindow, "Read error: %s\n", strerror(errno));
+            wprintw(messageWindow, "handleReceivedMessage() : Read error: %s\n", strerror(errno));
             wrefresh(messageWindow);
             break;
         }
-        usleep(50000); // Throttle loop to reduce CPU usage
+        usleep(50000); // Slight delay
     }
     return NULL;
 }
@@ -129,7 +148,7 @@ int startReceivingThread()
 void handleUserInput()
 {
     char sendBuffer[MAX_MESSAGE_SIZE] = {0};
-    int userInputIndex = 0; // For tracking WHERE to put the character the user types in the sendBuffer
+    int userInputIndex = 0;    // For tracking WHERE to put the character the user types in the sendBuffer
     int currentCharacterAscii; // Storage for the current character ascii value, or error return from wgetch()
 
     while (1)
@@ -143,7 +162,7 @@ void handleUserInput()
             usleep(50000);
             continue;
         }
-        
+
         // If the user pressed enter and the input is GREATER than 0 (the user typed a character)
         if (currentCharacterAscii == '\n' && userInputIndex > 0)
         {
@@ -186,16 +205,23 @@ void handleUserInput()
  */
 void cleanup()
 {
+    // Close the socket
     close(socketFileDescriptor);
+
+    // delete the message and user input windows
     delwin(messageWindow);
     delwin(userInputWindow);
+
+    // Restore the terminal to its original state (stops ncurses windows)
     endwin();
 }
 
 int main()
 {
+    // Call the function to initialize the ncurses interfaces
     initializeNcursesWindows();
 
+    // Try connecting to the server, if less than 0, something happened
     if (connectToServer("127.0.0.1") < 0)
     {
         wprintw(messageWindow, "Connect failed: %s\n", strerror(errno));
@@ -204,12 +230,19 @@ int main()
         exit(EXIT_FAILURE);
     }
 
+    // Ready the connection message
     wprintw(messageWindow, "Connected to server.\n");
+
+    // Print the connection message
     wrefresh(messageWindow);
 
+    // Start the thread to receive data from the server (background thread)
     startReceivingThread();
+
+    // Start the function to get input from the user
     handleUserInput();
 
+    // Clean up AFTER everything has stopped!
     cleanup();
     return 0;
 }
