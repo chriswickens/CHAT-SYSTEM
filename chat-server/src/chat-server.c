@@ -215,22 +215,43 @@ void processClientMessage(int clientSocket)
 
     while (1)
     {
+        // This is where you receive the message INCLUDING THE PROTOCOL DETAILS
+        // This will be the ACTUAL message + the protocol details
         int numberOfBytesRead = read(clientSocket, incomingMessage, MAX_MESSAGE_SIZE - 1);
+
         if (numberOfBytesRead > 0)
         {
-            incomingMessage[numberOfBytesRead] = '\0'; // Null-terminate the string.
+
+            // THIS IS WHERE YOU NEED TO DO PROTOCOL PARSING!
+
+            // Check if it is a FULL_MESSAGE, PART_ONE or PART_TWO
+            // Create an array that can hold a full 80 character message
+            // If it is part two, put it in the second half
+            // if it is part ONE put it in the first half
+            // In the ELSE statement below you can then iterate over the char array with the full message to send
+            // back to the client and split it up into two separate messages including the protocol needed for the client
+
+            // This will probably need to be +1 to properly null terminate the ACTUAL message!
+            incomingMessage[numberOfBytesRead + 1] = '\0'; // Null-terminate the string.
 
             // If the client sends "quit", disconnect.
-            if (strcmp(incomingMessage, "quit") == 0)
+            if (strcmp(incomingMessage, ">>bye<<") == 0)
             {
                 printf("DEBUG processClientMessage: Client on fd %d requested disconnect.\n", clientSocket);
                 break;
             }
             else
             {
+                // Iterate over the FULL message and split it then send each part
+                // This will require a SHORT delay using usleep() if the message is split
+                // to ensure that we are not trying to send two messages at the exact same time
+                // Maybe use a BOOL that is changed like oneMessage = true when its one message
+                // and if its two messages, change that to false, then using that, send both
+                // halfs to the server with the delay between the first and second one
                 broadcastChatMessage(incomingMessage);
             }
         }
+
         else if (numberOfBytesRead == 0)
         {
             // Client disconnected.
