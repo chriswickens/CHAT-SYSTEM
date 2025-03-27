@@ -19,7 +19,8 @@
  #include <sys/socket.h>
  #include <netinet/in.h>
  #include <pthread.h>
- 
+ #include <ctype.h> // for isspace()
+
  #define PORT 8888
  #define MAX_CLIENTS 10
  #define MAX_MESSAGE_SIZE 128  // Increased size to allow for protocol overhead
@@ -203,36 +204,68 @@
      }
      pthread_mutex_unlock(&clientMutex);
  }
- 
- // Processes messages from a single client. This function runs in its dedicated thread.
- void processClientMessage(int clientSocket) {
-     char incomingMessage[MAX_MESSAGE_SIZE];
- 
-     while (1) {
-         int numberOfBytesRead = read(clientSocket, incomingMessage, MAX_MESSAGE_SIZE - 1);
-         if (numberOfBytesRead > 0) {
-             incomingMessage[numberOfBytesRead] = '\0';
- 
-             // If the client sends ">>bye<<", disconnect.
-             if (strcmp(incomingMessage, ">>bye<<") == 0) {
-                 printf("DEBUG processClientMessage: Client on socket #%d requested disconnect.\n", clientSocket);
-                 break;
-             }
-             else {
-                 // Parse the protocol message and broadcast the formatted message.
-                 parseAndBroadcastProtocolMessage(incomingMessage, clientSocket);
-             }
-         }
-         else if (numberOfBytesRead == 0) {
-             printf("Client on socket #%d disconnected.\n", clientSocket);
-             break;
-         }
-         else {
-             perror("read error");
-             break;
-         }
-     }
- }
+
+
+void processClientMessage(int clientSocket) {
+    char incomingMessage[MAX_MESSAGE_SIZE];
+
+    while (1) {
+        int numberOfBytesRead = read(clientSocket, incomingMessage, MAX_MESSAGE_SIZE - 1);
+        if (numberOfBytesRead > 0) {
+            incomingMessage[numberOfBytesRead] = '\0';
+
+            // Remove trailing whitespace
+            int end = numberOfBytesRead;
+            while (end > 0 && isspace((unsigned char)incomingMessage[end - 1])) {
+                incomingMessage[end - 1] = '\0';
+                end--;
+            }
+
+            // Debug print the raw protocol message.
+            printf("DEBUG: Received message from socket %d (len=%d): \"%s\"\n", clientSocket, numberOfBytesRead, incomingMessage);
+
+            // Extract the protocol fields to get the actual message text.
+            char temp[256];
+            strncpy(temp, incomingMessage, sizeof(temp) - 1);
+            temp[sizeof(temp)-1] = '\0';
+
+            // Protocol format: CLIENTIP|USERNAME|MESSAGECOUNT|"Message text"
+            char *ipField = strtok(temp, "|");
+            char *usernameField = strtok(NULL, "|");
+            char *msgCountField = strtok(NULL, "|");
+            char *messageField = strtok(NULL, "|");
+
+            // Remove surrounding quotes from the messageField if present.
+            if (messageField != NULL) {
+                size_t len = strlen(messageField);
+                if (len >= 2 && messageField[0] == '\"' && messageField[len - 1] == '\"') {
+                    messageField[len - 1] = '\0';
+                    messageField++;
+                }
+            }
+
+            // If the extracted message text is ">>bye<<", disconnect.
+            if (messageField && strcmp(messageField, ">>bye<<") == 0) {
+                printf("DEBUG processClientMessage: Client on socket #%d requested disconnect.\n", clientSocket);
+                break;
+            }
+            else {
+                // Parse the full protocol message and broadcast the formatted message.
+                parseAndBroadcastProtocolMessage(incomingMessage, clientSocket);
+            }
+        }
+        else if (numberOfBytesRead == 0) {
+            printf("Client on socket #%d disconnected.\n", clientSocket);
+            break;
+        }
+        else {
+            perror("read error");
+            break;
+        }
+    }
+}
+
+
  
  // Thread function for handling a client's messages.
  void *clientHandler(void *clientSocketPointer) {
