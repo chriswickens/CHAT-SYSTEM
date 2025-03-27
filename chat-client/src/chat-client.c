@@ -168,7 +168,7 @@ void handleUserInput()
         {
             // Send when Enter pressed
             write(socketFileDescriptor, sendBuffer, userInputIndex);
-            wprintw(messageWindow, "Sent: %s\n", sendBuffer);
+            wprintw(messageWindow, "CLIENT SIDE DEBUG: Sent: %s\n", sendBuffer);
             wrefresh(messageWindow);
             memset(sendBuffer, 0, sizeof(sendBuffer));
             userInputIndex = 0;
@@ -190,7 +190,9 @@ void handleUserInput()
                 sendBuffer[userInputIndex] = '\0'; // Put a null terminator at the end!
 
                 // Erase the input window after the input is stored in the buffer
-                werase(userInputWindow);
+                
+                // This is how the terminal display 
+                // werase(userInputWindow);
                 box(userInputWindow, 0, 0);
                 mvwprintw(userInputWindow, 1, 1, "> %s", sendBuffer);
                 wmove(userInputWindow, 1, 3 + userInputIndex);

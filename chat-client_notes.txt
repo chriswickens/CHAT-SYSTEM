@@ -1,0 +1,91 @@
+A4 Notes:
+
+Server must be able to support 10 people
+
+KILL THE FUCKING SERVER BECAUSE IT SUCKS ASS
+get the pid
+sudo lsof -i :8888
+
+COMMAND    PID     USER   FD   TYPE DEVICE SIZE/OFF NODE NAME
+chat-clie 6351 cwickens    3u  IPv4  81361      0t0  TCP localhost:49050->localhost:8888 (CLOSE_WAIT)
+
+use the PID to kill the server process
+cwickens@cwickensVM:~/Desktop/CHAT-SYSTEM/chat-server/bin$ kill -9 6351
+
+
+Client command line arguments:
+-user<USERID> -server<SERVERNAME>
+
+Must be able to find the server name, which is the ipv4 address!
+cwickens@cwickensVM:~$ cd /etc/hosts
+bash: cd: /etc/hosts: Not a directory
+cwickens@cwickensVM:~$ cd /etc/
+cwickens@cwickensVM:/etc$ nano hosts
+cwickens@cwickensVM:/etc$ 
+
+
+In the text file:
+127.0.0.1	localhost
+127.0.1.1	cwickensVM
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+
+
+layout of chat UI
+Incoming/Outgoing arrows: THe client message gets SENT and displayed in the client window as well, the directional arrow when they display
+their own message is the OUTGOING message
+IP ADDRESS /t/t [NAME] >> Outgoing message /t/t/t <TIMESTAMP>
+IP ADDRESS /t/t [NAME] << INCOMING message /t/t/t <TIMESTAMP>
+
+
+
+CLIENT EXIT: ">>bye<<" - Exits, then the server cleans up that client
+
+
+CLIENT SPECIFIC DETAILS:
+We need to update the client to use threading AND non-blocking sockets to make the UI work properly!
+
+Command Line Arguments (make a function to parse this)
+Get the user name and the server to connect to
+chat-client application’s -server command-line argument – you need to be able to handle and support the server’s (true) name as well as the server’s IP Address
+For example:
+chat-client –userSean –serverSERVER_NAME
+or
+chat-client –userSean –serverSERVER_IP
+
+Client sends message
+Server receives message
+Server broadcasts message to all clients
+Client checks the message to see if the IP address of the sender matches theirs
+Use getsockname() to get the clients IP address and store it, then check it against the IP in the message header
+Client determines how to display message if it does/does not contain their IP address
+
+Message Input:
+Maybe add a character counter?...
+Cannot accept more than 80 characters, STOP ACCEPTING CHARACTERS AT #80! If they type more IT WILL NOT BE SHOWN IN THEIR CHAT ENTRY!
+
+Handling messages over 40 characters on the client:
+Maximum 80 characters
+Split up when the user enters 40 characters at a time
+EX: If the user types 56 chars before pressing ENTER
+Attempt to break the message up at SPACES rather than in an arbitrary location
+Should we break up the message at the client or the server? Probably at the client because I'm lazy
+The OUTPUT window will have up to 10 LINES of messages, and ONE message can ONLY be 40 characters long
+so a message that is 56 characters, try to split it at a space so for example:
+
+If you have a 56 character message and there is a space at character # 38, break it at character 38
+Display the first 38 characters on the FIRST line
+then
+display the remaining characters
+
+
+Client Receives a Message:
+Display a MAXIMUM of 10 messages in the message history! (a message is able to take up 2 lines!)
+ONE LINE for each 40 character message!
+If a message is OVER 40 characters, it will display the normal message details (IP, user name of sender etc) for EACH piece of the message! (if a message is split up, BOTH parts must have the message information!)

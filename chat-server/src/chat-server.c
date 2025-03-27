@@ -188,7 +188,7 @@ void acceptConnection(int listenSocket)
 void broadcastChatMessage(char *messageToBroadcast)
 {
     // Simulate a user name.
-    char userName[] = "Wickens";
+    char userName[] = "MSG From Server";
     char combinedMessage[MAX_MESSAGE_SIZE + sizeof(userName) + 3]; // username, ": ", message, null terminator
     snprintf(combinedMessage, sizeof(combinedMessage), "%s: %s", userName, messageToBroadcast);
 

@@ -1,0 +1,9 @@
+SERVER SPECIFIC DETAILS:
+NO command line arguments needed!
+Server name: Can be the NAME of the system OR the IP address!
+
+Current server is set to loopback, must be changed to use its own IP address for proper testing purposes
+Server binding to its own IP: server_addr.sin_addr.s_addr = INADDR_ANY; (INADD_ANY is how this is done)
+
+SERVER SIDE:
+If the client has sent TWO messages that the total length is equal to or less than 80, put the WHOLE message into an array and use that array to try and see where it can split the message properly (Some more math is required to ensure the message is split properly IF IT CAN BE, some situations the message may not be able to be split properly, EG: If a word occupies spaces (for arguments sake) 30~ to 40~+ the WORD will have to be split and part of it displayed on two separate lines.
