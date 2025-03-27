@@ -237,7 +237,7 @@ void processClientMessage(int clientSocket)
             // If the client sends "quit", disconnect.
             if (strcmp(incomingMessage, ">>bye<<") == 0)
             {
-                printf("DEBUG processClientMessage: Client on fd %d requested disconnect.\n", clientSocket);
+                printf("DEBUG processClientMessage: Client on socket #%d requested disconnect.\n", clientSocket);
                 break;
             }
             else
