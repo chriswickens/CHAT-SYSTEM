@@ -181,7 +181,7 @@ void acceptConnection(int listenSocket)
     // Detach the thread so resources are freed on exit.
     pthread_detach(threadId);
 
-    printf("DEBUG acceptConnection: New connection, fd: %d\n", clientSocket);
+    printf("DEBUG acceptConnection: New connection, socket #%d\n", clientSocket);
 }
 
 // Broadcasts a chat message to all connected clients.
@@ -255,7 +255,7 @@ void processClientMessage(int clientSocket)
         else if (numberOfBytesRead == 0)
         {
             // Client disconnected.
-            printf("Client on fd %d disconnected.\n", clientSocket);
+            printf("Client on socket #%d disconnected.\n", clientSocket);
             break;
         }
         else
