@@ -19,9 +19,12 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
-#include <ctype.h> // for isspace()
+#include <ctype.h>
 
+// common.h
 #define PORT 8888
+
+// chat-server.h
 #define MAX_CLIENTS 10
 #define MAX_MESSAGE_SIZE 128 // Increased size to allow for protocol overhead
 

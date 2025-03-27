@@ -24,6 +24,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
+// some of these belong in the common.h file
 #define SERVER_PORT 8888      // Port number of chat server
 #define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
 #define MAX_PROTOCOL_SIZE 256 // Buffer size for protocol messages
@@ -36,6 +37,7 @@ char receiveBuffer[MAX_PROTOCOL_SIZE];   // Buffer for incoming messages
 char clientIP[INET_ADDRSTRLEN]; // Stores the client's IP address
 
 // Function prototypes.
+// These belong in the chat-client.h file
 void initializeNcursesWindows(void);
 int connectToServer(const char *serverIpAddress);
 void *handleReceivedMessage(void *arg);
@@ -168,6 +170,7 @@ void *handleReceivedMessage(void *arg)
         if (numberOfBytesRead > 0)
         {
             receiveBuffer[numberOfBytesRead] = '\0';
+
             // Check if the received message starts with our clientIP.
             if (strncmp(receiveBuffer, clientIP, strlen(clientIP)) == 0)
             {
@@ -240,8 +243,9 @@ void handleUserInput()
             sendBuffer[userInputIndex] = '\0';
             int len = strlen(sendBuffer);
             char protocolMsg[MAX_PROTOCOL_SIZE];
-            char part1[MAX_PART_LEN + 1] = {0};
-            char part2[MAX_PART_LEN + 1] = {0};
+            char part1[MAX_PART_LEN + 1] = {"0"};
+            char part2[MAX_PART_LEN + 1] = {"0"};
+            
             // Hardcoded username "Chris"
             const char *username = "Chris";
             if (len <= MAX_PART_LEN)
