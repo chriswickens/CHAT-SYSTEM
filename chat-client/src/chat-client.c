@@ -223,13 +223,17 @@ void cleanup()
     endwin();
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+    char serverIP[15];
+    char userName[6];
+    strcpy(serverIP, argv[2] + 7); // + 7 to start parsing after the -server
+    strcpy(userName, argv[1] + 5); // + 5 to start parsing after the -client
     // Call the function to initialize the ncurses interfaces
     initializeNcursesWindows();
 
     // Try connecting to the server, if less than 0, something happened
-    if (connectToServer("127.0.0.1") < 0)
+    if (connectToServer(serverIP) < 0)  //127.0.0.1
     {
         wprintw(messageWindow, "Connect failed: %s\n", strerror(errno));
         wrefresh(messageWindow);
