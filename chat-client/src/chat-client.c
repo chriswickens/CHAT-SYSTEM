@@ -22,9 +22,9 @@
 // #define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
 // #define MAX_PART_LEN 40       // Maximum characters per message part
 
-int socketFileDescriptor;                // Global socket descriptor
-WINDOW *messageWindow, *userInputWindow; // ncurses windows for chat display and input
-char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];   // Buffer for incoming messages
+int socketFileDescriptor;                    // Global socket descriptor
+WINDOW *messageWindow, *userInputWindow;     // ncurses windows for chat display and input
+char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE]; // Buffer for incoming messages
 
 char clientIP[INET_ADDRSTRLEN]; // Stores the client's IP address
 
@@ -36,17 +36,17 @@ void *handleReceivedMessage(void *arg);
 int startReceivingThread(void);
 void handleUserInput(char *userName, char *clientIP);
 void cleanup(void);
-void getLocalIP(int sockfd, char *ipBuffer, size_t bufferSize);
+void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize);
 void splitMessage(const char *fullString, char *firstPart, char *secondPart);
 
 // Get the local IP address from the connected socket.
-void getLocalIP(int sockfd, char *ipBuffer, size_t bufferSize)
+void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize)
 {
-    struct sockaddr_in addr;
-    socklen_t addr_len = sizeof(addr);
-    if (getsockname(sockfd, (struct sockaddr *)&addr, &addr_len) == 0)
+    struct sockaddr_in address;
+    socklen_t addressLength = sizeof(address);
+    if (getsockname(socketDescriptor, (struct sockaddr *)&address, &addressLength) == 0)
     {
-        inet_ntop(AF_INET, &addr.sin_addr, ipBuffer, bufferSize);
+        inet_ntop(AF_INET, &address.sin_addr, ipBuffer, bufferSize);
     }
     else
     {
@@ -65,50 +65,107 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
         secondPart[0] = '\0';
         return;
     }
+
+    // Get the MINIMUM split location (-40)
     int minSplit = fullStringLength - CLIENT_MSG_PART_LENGTH;
+
+    // Max split assigned 40 to start
     int maxSplit = CLIENT_MSG_PART_LENGTH;
+
+    // Divide to get possible mid-point of full message
     int midPoint = fullStringLength / 2;
+
+    // PLaceholder for split index
     int splitIndex = -1;
-    for (int offset = 0; offset <= (maxSplit - minSplit); offset++)
+
+    // Iterate over the the message to find where to potentially split it (checking for a space in the middle or close to it)
+    for (
+        // Start the offset at 0
+        int splitOffset = 0;
+        // WHILE the split offset is LESS than or EQUAL to the max (string length - 40)
+        splitOffset <= (maxSplit - minSplit);
+        // Increment the split offset to keep checking
+        splitOffset++)
     {
-        int lower = midPoint - offset;
-        if (lower >= minSplit && lower <= maxSplit && fullString[lower] == ' ')
+        // Index of the lower half of the message by subtracting the midpoint from the split offset
+        int lowerHalfMessage = midPoint - splitOffset;
+
+        if (
+            // If the lower half of the message split is GREATER or EQUAL to minsplit
+            lowerHalfMessage >= minSplit &&
+            // AND the lower half is LESS THAN or EQUAL to the maxsplit
+            lowerHalfMessage <= maxSplit &&
+            // And the index of the full string is a SPACE (proper split!)
+            fullString[lowerHalfMessage] == ' ')
         {
-            splitIndex = lower;
+            // Assign the split index to the current index of the space!
+            splitIndex = lowerHalfMessage;
             break;
         }
-        int upper = midPoint + offset;
-        if (upper >= minSplit && upper <= maxSplit && fullString[upper] == ' ')
+
+        // Set the upper half to be the midpoint + the split offset (if the above IF was not used)
+        // This attempts to split at the best possible location in a not great case
+        // Calculate where the upper half of the message is using the mid point and the split offset
+        int upperHalfMessage = midPoint + splitOffset;
+
+        if (
+            // Is the upper hald of the message is GREATER or EQUAL to the MINIMUM split index
+            upperHalfMessage >= minSplit &&
+
+            // AND the upper half is LESS than or EQUAL to the MAXIMUM split index
+            upperHalfMessage <= maxSplit &&
+
+            // AND the character is a SPACE!
+            fullString[upperHalfMessage] == ' ')
         {
-            splitIndex = upper;
+            // Set the split index to be the location of the best possible split location
+            splitIndex = upperHalfMessage;
             break;
         }
     }
+
+    // If the split index is -1, split it right down the middle (no space, no best split, just cut it in half)
     if (splitIndex == -1)
+    {
         splitIndex = midPoint;
+    }
+
+    // If there was a space in the middle of the message (easiest case!), split it there!
     if (fullString[splitIndex] == ' ')
     {
+        // Copy the first part of the split using the split index
         strncpy(firstPart, fullString, splitIndex);
+
+        // Set the last character of the first part to be a null term (proper string yo!)
         firstPart[splitIndex] = '\0';
-        int secondLen = fullStringLength - (splitIndex + 1);
+
+        // Get the second half of the string using the FULL length and subtracting the location of the split +1 to offset
+        // the split
+        int secondHalfLength = fullStringLength - (splitIndex + 1);
+        if (secondHalfLength > CLIENT_MSG_PART_LENGTH)
+        {
+            secondHalfLength = CLIENT_MSG_PART_LENGTH;
+        }
+
+        // Copy the second part and add a null terminator
+        strncpy(secondPart, fullString + splitIndex + 1, secondHalfLength);
+        secondPart[secondHalfLength] = '\0';
+    }
+
+    // Otherwise, just cut the whole thing in half, most likely it was a big word in the middle of a large message
+    else
+    {
+        strncpy(firstPart, fullString, splitIndex);
+        
+        firstPart[splitIndex] = '\0';
+
+        int secondLen = fullStringLength - splitIndex;
+
         if (secondLen > CLIENT_MSG_PART_LENGTH)
         {
             secondLen = CLIENT_MSG_PART_LENGTH;
         }
-            
-        strncpy(secondPart, fullString + splitIndex + 1, secondLen);
-        secondPart[secondLen] = '\0';
-    }
-    else
-    {
-        strncpy(firstPart, fullString, splitIndex);
-        firstPart[splitIndex] = '\0';
-        int secondLen = fullStringLength - splitIndex;
-        if (secondLen > CLIENT_MSG_PART_LENGTH)
-        {
-             secondLen = CLIENT_MSG_PART_LENGTH;
-        }
-           
+
         strncpy(secondPart, fullString + splitIndex, secondLen);
         secondPart[secondLen] = '\0';
     }
@@ -329,7 +386,6 @@ int main(int argc, char *argv[])
 
 
     */
-
 
     // Used for getting clients own IP to send to server, or check IP on broadcast msg...
     char host[256];
