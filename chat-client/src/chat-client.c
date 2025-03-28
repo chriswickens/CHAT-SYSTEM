@@ -657,7 +657,8 @@
      wprintw(receivedMessagesWindow, "Server : %s\n", serverName);
      wrefresh(receivedMessagesWindow);
      startReceivingThread();
-     handleUserInput(userName, serverName);
+     // CHANGED THIS: Pass clientIP instead of serverName so the correct IP is sent in the protocol messages.
+     handleUserInput(userName, clientIP);
      cleanup();
      return 0;
  }
