@@ -15,15 +15,8 @@
  */
 
 #include <ncurses.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
 #include <pthread.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -33,11 +26,13 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "../../Common/inc/common.h"
+#include "../inc/chat-client.h"
 
 // some of these belong in the common.h file
 #define SERVER_PORT 8888      // Port number of chat server
 #define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
-#define MAX_PROTOCOL_SIZE 256 // Buffer size for protocol messages
+#define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
 #define MAX_PART_LEN 40       // Maximum characters per message part
 
 int socketFileDescriptor;                // Global socket descriptor
@@ -52,7 +47,7 @@ void initializeNcursesWindows(void);
 int connectToServer(const char *serverIpAddress);
 void *handleReceivedMessage(void *arg);
 int startReceivingThread(void);
-void handleUserInput(char * userName, char* clientIP);
+void handleUserInput(char *userName, char *clientIP);
 void cleanup(void);
 void getLocalIP(int sockfd, char *ipBuffer, size_t bufferSize);
 void splitMessage(const char *fullString, char *firstPart, char *secondPart);
@@ -233,9 +228,9 @@ void sendProtocolMessage(const char *message)
     }
 }
 
-void handleUserInput(char * clientName, char* clientIP)
+void handleUserInput(char *clientName, char *clientIP)
 {
-    //clientIP is now available to send to the server or to be used to verify the broadcast.
+    // clientIP is now available to send to the server or to be used to verify the broadcast.
     char sendBuffer[MAX_MESSAGE_SIZE] = {0};
     int userInputIndex = 0;
     int currentCharacterAscii;
@@ -256,23 +251,23 @@ void handleUserInput(char * clientName, char* clientIP)
             char protocolMsg[MAX_PROTOCOL_SIZE];
             char part1[MAX_PART_LEN + 1] = {"0"};
             char part2[MAX_PART_LEN + 1] = {"0"};
-            
+
             // Hardcoded username "Chris"
             const char *username = clientName;
             if (len <= MAX_PART_LEN)
             {
                 // Single message: MESSAGECOUNT 0.
-                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|0|\"%s\"", clientIP, username, sendBuffer);
+                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|0|%s", clientIP, username, sendBuffer);
                 sendProtocolMessage(protocolMsg);
             }
             else
             {
                 // Split the message into two parts.
                 splitMessage(sendBuffer, part1, part2);
-                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|1|\"%s\"", clientIP, username, part1);
+                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|1|%s", clientIP, username, part1);
                 sendProtocolMessage(protocolMsg);
                 usleep(50000); // Small delay to help preserve order.
-                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|2|\"%s\"", clientIP, username, part2);
+                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|2|%s", clientIP, username, part2);
                 sendProtocolMessage(protocolMsg);
             }
             // Clear the input (do not print the sent message in the chat window).
@@ -280,7 +275,7 @@ void handleUserInput(char * clientName, char* clientIP)
             userInputIndex = 0;
             werase(userInputWindow);
             box(userInputWindow, 0, 0);
-            mvwprintw(userInputWindow, 1, 1, "> ");
+            mvwprintw(userInputWindow, 1, 1, "%s ", CLIENT_INPUT_MARKER);
             wmove(userInputWindow, 1, 3);
             wrefresh(userInputWindow);
         }
@@ -291,7 +286,7 @@ void handleUserInput(char * clientName, char* clientIP)
                 sendBuffer[userInputIndex++] = currentCharacterAscii;
                 sendBuffer[userInputIndex] = '\0';
                 box(userInputWindow, 0, 0);
-                mvwprintw(userInputWindow, 1, 1, "> %s", sendBuffer);
+                mvwprintw(userInputWindow, 1, 1, "%s %s", CLIENT_INPUT_MARKER, sendBuffer);
                 wmove(userInputWindow, 1, 3 + userInputIndex);
                 wrefresh(userInputWindow);
             }
@@ -307,48 +302,60 @@ void cleanup()
     endwin();
 }
 
-
-void check_host_name(int hostname) { //This function returns host name for local computer
-    if (hostname == -1) {
-       perror("gethostname");
-       exit(1);
+void check_host_name(int hostname)
+{ // This function returns host name for local computer
+    if (hostname == -1)
+    {
+        perror("gethostname");
+        exit(1);
     }
- }
- void check_host_entry(struct hostent * hostentry) { //find host info from host name
-    if (hostentry == NULL){
-       perror("gethostbyname");
-       exit(1);
+}
+void check_host_entry(struct hostent *hostentry)
+{ // find host info from host name
+    if (hostentry == NULL)
+    {
+        perror("gethostbyname");
+        exit(1);
     }
- }
- void IP_formatter(char *IPbuffer) { //convert IP string to dotted decimal format
-    if (NULL == IPbuffer) {
-       perror("inet_ntoa");
-       exit(1);
+}
+void IP_formatter(char *IPbuffer)
+{ // convert IP string to dotted decimal format
+    if (NULL == IPbuffer)
+    {
+        perror("inet_ntoa");
+        exit(1);
     }
- }
+}
 
-
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-    //Used for getting clients own IP to send to server, or check IP on broadcast msg...
+
+    /*
+
+        TO DO: Need to check if when running the program NO arguments are provided!
+
+
+    */
+
+
+    // Used for getting clients own IP to send to server, or check IP on broadcast msg...
     char host[256];
     char *clientIP;
     struct hostent *host_entry;
     int hostname;
-    hostname = gethostname(host, sizeof(host)); //find the host name
+    hostname = gethostname(host, sizeof(host)); // find the host name
     check_host_name(hostname);
-    host_entry = gethostbyname(host); //find host information
+    host_entry = gethostbyname(host); // find host information
     check_host_entry(host_entry);
-    clientIP = inet_ntoa(*((struct in_addr*) host_entry->h_addr_list[0])); //Convert into IP string
-    //printf("Current Host Name: %s\n", host);
-    //printf("Host IP: %s\n", clientIP);
-    //End of clients IP get***************************
-
+    clientIP = inet_ntoa(*((struct in_addr *)host_entry->h_addr_list[0])); // Convert into IP string
+    // printf("Current Host Name: %s\n", host);
+    // printf("Host IP: %s\n", clientIP);
+    // End of clients IP get***************************
 
     char userName[6] = {0};
     char serverIP[16] = {0};
-    strcpy(userName,argv[1] + 5); //Only want to parse after the -user
-    strcpy(serverIP, argv[2] + 7); //Only want to parse after the -server
+    strcpy(userName, argv[1] + 5); // Only want to parse after the -user
+    strcpy(serverIP, argv[2] + 7); // Only want to parse after the -server
     initializeNcursesWindows();
 
     if (connectToServer(serverIP) < 0)
