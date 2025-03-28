@@ -331,6 +331,7 @@ int connectToServer(const char *serverIpAddress)
     if (connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
         close(socketFileDescriptor);
+        printf("ERROR CONNECTING TO SERVER!!\n\n");
         return -1;
     }
     // Get the client's IP address after connecting
