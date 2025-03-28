@@ -45,19 +45,41 @@ void checkHostName(int hostname);
 void checkHostEntryDetails(struct hostent *hostentry);
 void ipAddressFormatter(char *IPbuffer);
 
-// Get the local IP address from the connected socket
+// THIS WAS CHANGED: Modified getLocalIP() to use a dummy UDP socket to get the external IP.
 void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize)
 {
-    struct sockaddr_in address;
-    socklen_t addressLength = sizeof(address);
-    if (getsockname(socketDescriptor, (struct sockaddr *)&address, &addressLength) == 0)
-    {
-        inet_ntop(AF_INET, &address.sin_addr, ipBuffer, bufferSize);
-    }
-    else
+    (void) socketDescriptor; // Unused in the new implementation.
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0)
     {
         strncpy(ipBuffer, "0.0.0.0", bufferSize);
+        return;
     }
+    
+    struct sockaddr_in serv;
+    memset(&serv, 0, sizeof(serv));
+    serv.sin_family = AF_INET;
+    serv.sin_addr.s_addr = inet_addr("8.8.8.8");  // Using Google DNS to determine external IP.
+    serv.sin_port = htons(53);
+    
+    if (connect(sock, (struct sockaddr *)&serv, sizeof(serv)) < 0)
+    {
+        close(sock);
+        strncpy(ipBuffer, "0.0.0.0", bufferSize);
+        return;
+    }
+    
+    struct sockaddr_in local;
+    socklen_t local_len = sizeof(local);
+    if (getsockname(sock, (struct sockaddr *)&local, &local_len) < 0)
+    {
+        close(sock);
+        strncpy(ipBuffer, "0.0.0.0", bufferSize);
+        return;
+    }
+    
+    inet_ntop(AF_INET, &local.sin_addr, ipBuffer, bufferSize);
+    close(sock);
 }
 
 // Splitting function based on the provided algorithm
@@ -597,24 +619,9 @@ int main(int argc, char *argv[])
     printf("Server Name: %s\n", serverName);
     printf("Socket Ip: %s\n", serverIp);
 
-    // Used for getting clients own IP to send to server, or check IP on broadcast msg...
+    // THIS WAS CHANGED: Removed the gethostbyname block and replaced it with a simple gethostname() call.
     char host[256];
-    char *clientIP;
-
-    struct hostent *hostDetails;
-    int hostname;
-    hostname = gethostname(host, sizeof(host)); // find the host name
-
-    // Rework this function to check for the host name
-    // checkHostName(hostname);
-
-    hostDetails = gethostbyname(host); // find host information
-    // checkHostEntryDetails(hostDetails);
-
-    clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0])); // Convert into IP string
-    // printf("Current Host Name: %s\n", host);
-    // printf("Host IP: %s\n", clientIP);
-    // End of clients IP get***************************
+    gethostname(host, sizeof(host));
 
     initializeNcursesWindows();
 
@@ -626,14 +633,9 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    // wprintw(receivedMessagesWindow, "Connected to server.\n");
-
-    // Display host details from struct
-    // wprintw(receivedMessagesWindow, "DEBUG: IP: %s\n", clientIP);
-
-    // This is what will need to be used when to get the server HOST NAME (non-ip)
-    wprintw(receivedMessagesWindow, "Host Name: %s\n", hostDetails->h_name);
-    wprintw(receivedMessagesWindow, "SERVER IP: %s\n", serverIp);
+    // THIS WAS CHANGED: Use 'host' from gethostname() instead of hostDetails->h_name.
+    wprintw(receivedMessagesWindow, "Host Name: %s\n", host);
+    wprintw(receivedMessagesWindow, "CLIENT IP: %s\n", clientIP);
     wrefresh(receivedMessagesWindow);
     startReceivingThread();
     handleUserInput(userName, clientIP);
