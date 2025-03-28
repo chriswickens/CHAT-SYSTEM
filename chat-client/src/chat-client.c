@@ -197,10 +197,13 @@ void initializeNcursesWindows(void)
     start_color();
 
     // Test pair of colours
-    init_pair(1, COLOR_RED, COLOR_MAGENTA); // Text color: RED, Background color: BLACK
-    init_pair(2, COLOR_WHITE, COLOR_BLUE);
-    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(4, COLOR_CYAN, COLOR_GREEN);
+    init_pair(1, COLOR_BLACK, COLOR_WHITE); // Title bar for messages received
+
+    init_pair(2, COLOR_BLACK, COLOR_YELLOW); // Received message area
+
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK); // Title bar for the user input
+
+    init_pair(4, COLOR_BLACK, COLOR_WHITE); // Actual user input areavvv
 
     /*
     Received Messages and Title Area
@@ -511,7 +514,7 @@ int main(int argc, char *argv[])
     else
     {
         // Check if the first argument is over 10 characters
-        if(strlen(argv[1]) > 10)
+        if (strlen(argv[1]) > 10)
         {
             printf("User name too long!\n");
             return -1;
@@ -547,8 +550,6 @@ int main(int argc, char *argv[])
         // printf("Current Host Name: %s\n", host);
         // printf("Host IP: %s\n", clientIP);
         // End of clients IP get***************************
-
-
 
         initializeNcursesWindows();
 
