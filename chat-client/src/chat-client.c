@@ -498,87 +498,145 @@ void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int user
 int main(int argc, char *argv[])
 {
 
-    // double check user name size
-    char userName[6] = {0};
-    char serverIP[16] = {0};
+    char userName[6];
+    char serverName[256] = "Ip address used";
+    char serverIp[17] = "Server name used";
 
-    char errorMessage[256];
-    int validArguments = 1;
-
+    // Check if arg count is valid
     if (argc != 3)
     {
-        validArguments = 0;
-        strcpy(errorMessage, TOO_FEW_ARGUMENTS);
-    }
-
-    else
-    {
-        // Check if the first argument is over 10 characters
-        if (strlen(argv[1]) > 10)
-        {
-            printf("User name too long!\n");
-            return -1;
-        }
-        strcpy(userName, argv[1] + 5); // Only want to parse after the -user
-        strcpy(serverIP, argv[2] + 7); // Only want to parse after the -server
-    }
-    /*
-
-        TO DO: Need to check if when running the program NO arguments are provided!
-
-
-    */
-
-    // If there are valid arguments
-    if (validArguments)
-    {
-        // Used for getting clients own IP to send to server, or check IP on broadcast msg...
-        char host[256];
-        char *clientIP;
-
-        struct hostent *hostDetails;
-        int hostname;
-        hostname = gethostname(host, sizeof(host)); // find the host name
-
-        // Rework this function to check for the host name
-        // checkHostName(hostname);
-
-        hostDetails = gethostbyname(host); // find host information
-        // checkHostEntryDetails(hostDetails);
-
-        clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0])); // Convert into IP string
-        // printf("Current Host Name: %s\n", host);
-        // printf("Host IP: %s\n", clientIP);
-        // End of clients IP get***************************
-
-        initializeNcursesWindows();
-
-        if (connectToServer(serverIP) < 0)
-        {
-            wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
-            wrefresh(receivedMessagesWindow);
-            cleanup();
-            exit(EXIT_FAILURE);
-        }
-
-        // wprintw(receivedMessagesWindow, "Connected to server.\n");
-
-        // Display host details from struct
-        // wprintw(receivedMessagesWindow, "DEBUG: IP: %s\n", clientIP);
-
-        // This is what will need to be used when to get the server HOST NAME (non-ip)
-        wprintw(receivedMessagesWindow, "Host Name: %s\n", hostDetails->h_name);
-
-        wrefresh(receivedMessagesWindow);
-        startReceivingThread();
-        handleUserInput(userName, clientIP);
-        cleanup();
-        return 0;
-    }
-
-    else
-    {
-        printf("ERROR: %s", errorMessage);
+        printf("Not Enough Arguments\n");
+        printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
         return -1;
     }
+
+    // Check for username switch
+    if (strstr(argv[1], "-user") != NULL)
+    {
+        // Parse and set username var if if not blank past the switch -user
+        argv[1] += strlen("-user"); // iterate past the -user
+
+        // Check to make sure strlen is valid 5 chars
+        if (strlen(argv[1]) > 5)
+        {
+            printf("User name exceedes the 5 character limit!\n");
+            printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
+            return -5;
+        }
+
+        if (strcmp(argv[1], "") != 0)
+        {
+            strcpy(userName, argv[1]);
+        }
+        else
+        {
+            printf("No user name attached to the -user switch!\n");
+            printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
+            return -2;
+        }
+    }
+    else // No -user switch
+    {
+        printf("No -user switch!\n");
+        printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
+        return -3;
+    }
+
+    // Server checks
+
+    // Check for server name switch
+    if (strstr(argv[2], "-server") != NULL)
+    {
+        // Parse and set server name var if if not blank past the switch -server
+        argv[2] += strlen("-server"); // iterate past the -server
+        if (strcmp(argv[2], "") != 0)
+        {
+            // check for ip
+            int part1, part2, part3, part4, result;
+
+            // Check to see if the argument is an ip address or a server name
+            result = sscanf(argv[2], "%d.%d.%d.%d", &part1, &part2, &part3, &part4);
+
+            if (result == 4)
+            {
+                // We have an Ip address
+                if (part1 >= 0 && part1 < 256 && part2 >= 0 && part2 < 256 && part3 >= 0 && part3 < 256 && part4 >= 0 && part4 < 256)
+                {
+                    // Ip address is valid
+                    strcpy(serverIp, argv[2]);
+                }
+                else
+                {
+                    // error invalid Ip
+                    printf("Server switch Ip Address is INVALID!\n");
+                    printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name or Ip address.\n");
+                    return -4;
+                }
+            }
+            else if (result == 0)
+            {
+                // Else we have a server name
+                strcpy(serverName, argv[2]);
+            }
+        }
+        else
+        {
+            printf("No server name attached to the -server switch!\n");
+            printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name or Ip address.\n");
+            return -2;
+        }
+    }
+    else
+    {
+        printf("No -server switch!\n");
+        printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name or Ip address.\n");
+        return -3;
+    }
+
+    printf("User Name: %s\n", userName);
+    printf("Server Name: %s\n", serverName);
+    printf("Socket Ip: %s\n", serverIp);
+
+    // Used for getting clients own IP to send to server, or check IP on broadcast msg...
+    char host[256];
+    char *clientIP;
+
+    struct hostent *hostDetails;
+    int hostname;
+    hostname = gethostname(host, sizeof(host)); // find the host name
+
+    // Rework this function to check for the host name
+    // checkHostName(hostname);
+
+    hostDetails = gethostbyname(host); // find host information
+    // checkHostEntryDetails(hostDetails);
+
+    clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0])); // Convert into IP string
+    // printf("Current Host Name: %s\n", host);
+    // printf("Host IP: %s\n", clientIP);
+    // End of clients IP get***************************
+
+    initializeNcursesWindows();
+
+    if (connectToServer(serverIp) < 0)
+    {
+        wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
+        wrefresh(receivedMessagesWindow);
+        cleanup();
+        exit(EXIT_FAILURE);
+    }
+
+    // wprintw(receivedMessagesWindow, "Connected to server.\n");
+
+    // Display host details from struct
+    // wprintw(receivedMessagesWindow, "DEBUG: IP: %s\n", clientIP);
+
+    // This is what will need to be used when to get the server HOST NAME (non-ip)
+    wprintw(receivedMessagesWindow, "Host Name: %s\n", hostDetails->h_name);
+    wprintw(receivedMessagesWindow, "SERVER IP: %s\n", serverIp);
+    wrefresh(receivedMessagesWindow);
+    startReceivingThread();
+    handleUserInput(userName, clientIP);
+    cleanup();
+    return 0;
 }
