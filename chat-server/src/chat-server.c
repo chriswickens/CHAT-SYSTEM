@@ -90,7 +90,7 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
         // }
         strncpy(messageText, token, sizeof(messageText) - 1);
         printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MESSAGE: %s\n", messageText);
-        printf("Literal Message Size: %i\n", strlen(messageText));
+        printf("Literal Message Size: %li\n", strlen(messageText));
     }
 
     // Format the final broadcast message.
@@ -103,18 +103,42 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     printf("-------Parsing INCOMING message-------\n\n");
 }
 
-int initializeListener()
-{
+int initializeListener() {
     int listenSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (listenSocket < 0)
-    {
+    if (listenSocket < 0) {
         perror("socket failed");
         exit(EXIT_FAILURE);
     }
 
+    char host[256];
+    char *clientIP;
+    struct hostent *hostDetails;
+    int hostname;
+
+    // Get the literal (local) host name
+    hostname = gethostname(host, sizeof(host));
+    if (hostname < 0) {
+        perror("gethostname failed");
+        exit(EXIT_FAILURE);
+    }
+    printf("Local host name (from gethostname): %s\n", host);
+
+    // Retrieve host details using the literal host name
+    hostDetails = gethostbyname(host);
+    if (hostDetails == NULL) {
+        herror("gethostbyname failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Print the canonical host name
+    printf("LITERAL host name: %s\n", hostDetails->h_name);
+
+
+    clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0]));
+    printf("Primary IP: %s\n", clientIP);
+
     int socketOption = 1;
-    if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &socketOption, sizeof(socketOption)) < 0)
-    {
+    if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &socketOption, sizeof(socketOption)) < 0) {
         perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
@@ -125,21 +149,18 @@ int initializeListener()
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(SERVER_PORT);
 
-    if (bind(listenSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
-    {
-        perror("socket binding failed!");
+    if (bind(listenSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0) {
+        perror("socket binding failed");
         exit(EXIT_FAILURE);
     }
 
-    if (listen(listenSocket, MAX_CLIENTS) < 0)
-    {
-        perror("socket listen failed!");
+    if (listen(listenSocket, MAX_CLIENTS) < 0) {
+        perror("socket listen failed");
         exit(EXIT_FAILURE);
     }
 
     return listenSocket;
 }
-
 // Accepts a new connection and spawns a thread to handle it.
 void acceptConnection(int listenSocket)
 {

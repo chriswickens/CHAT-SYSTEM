@@ -8,9 +8,11 @@
 #include <unistd.h>
 #include <errno.h>
 #include <netinet/in.h>
-#include <netinet/in.h>
+// #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <ctype.h>
+#include <netdb.h>
 
 // Your code here
 #define SERVER_PORT 8888

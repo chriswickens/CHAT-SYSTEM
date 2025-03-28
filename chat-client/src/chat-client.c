@@ -156,7 +156,7 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
     else
     {
         strncpy(firstPart, fullString, splitIndex);
-        
+
         firstPart[splitIndex] = '\0';
 
         int secondLen = fullStringLength - splitIndex;
@@ -173,11 +173,14 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 
 void initializeNcursesWindows()
 {
+    // Necessary functions to make the ncurses stuff work
     initscr();
     cbreak();
     noecho();
 
+
     int height, width;
+    // Get the max dimensions of the window
     getmaxyx(stdscr, height, width);
 
     messageWindow = newwin(height - 3, width, 0, 0);
@@ -194,17 +197,34 @@ void initializeNcursesWindows()
 
 int connectToServer(const char *serverIpAddress)
 {
+    // Setup a struct to hold the socket info
     struct sockaddr_in serverAddress;
+
+    // Setup the socket using IPv4
     socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+
+    // If the socket didnt work
     if (socketFileDescriptor < 0)
     {
         return -1;
     }
 
+    // Allocate memory to store the address information
     memset(&serverAddress, 0, sizeof(serverAddress));
+    // Setup address details
     serverAddress.sin_family = AF_INET;
+    // Setup the port
     serverAddress.sin_port = htons(SERVER_PORT);
-    inet_pton(AF_INET, serverIpAddress, &serverAddress.sin_addr);
+
+    // Convert the IP from the command line argument to an IP address
+    int addressResult = inet_pton(AF_INET, serverIpAddress, &serverAddress.sin_addr);
+
+    if(addressResult < 0)
+    {
+        // Error out if the address was invalid
+        printf("INVALID ADDRESS.");
+        return -1;
+    }
 
     if (connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
@@ -390,21 +410,29 @@ int main(int argc, char *argv[])
     // Used for getting clients own IP to send to server, or check IP on broadcast msg...
     char host[256];
     char *clientIP;
-    struct hostent *host_entry;
+
+    struct hostent *hostDetails;
     int hostname;
     hostname = gethostname(host, sizeof(host)); // find the host name
-    check_host_name(hostname);
-    host_entry = gethostbyname(host); // find host information
-    check_host_entry(host_entry);
-    clientIP = inet_ntoa(*((struct in_addr *)host_entry->h_addr_list[0])); // Convert into IP string
+
+    // Rework this function to check for the host name
+    // check_host_name(hostname);
+
+    hostDetails = gethostbyname(host); // find host information
+    // check_host_entry(hostDetails);
+
+    clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0])); // Convert into IP string
     // printf("Current Host Name: %s\n", host);
     // printf("Host IP: %s\n", clientIP);
-    // End of clients IP get***************************
+    // End of clients IP get*************************** 
 
+    // double check user name size
     char userName[6] = {0};
     char serverIP[16] = {0};
+
     strcpy(userName, argv[1] + 5); // Only want to parse after the -user
     strcpy(serverIP, argv[2] + 7); // Only want to parse after the -server
+
     initializeNcursesWindows();
 
     if (connectToServer(serverIP) < 0)
@@ -416,6 +444,14 @@ int main(int argc, char *argv[])
     }
 
     wprintw(messageWindow, "Connected to server.\n");
+
+    // Display host details from struct
+    wprintw(messageWindow, "DEBUG: IP: %s\n", clientIP);
+
+    // This is what will need to be used when to get the server HOST NAME (non-ip)
+    // wprintw(messageWindow, "Host Name: %s\n", hostDetails->h_name);
+    // wprintw(messageWindow, "Host ALIASES: %s\n", hostDetails->h_aliases);
+
     wrefresh(messageWindow);
     startReceivingThread();
     handleUserInput(userName, clientIP);
