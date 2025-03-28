@@ -24,6 +24,16 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 // some of these belong in the common.h file
 #define SERVER_PORT 8888      // Port number of chat server
 #define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
@@ -42,7 +52,7 @@ void initializeNcursesWindows(void);
 int connectToServer(const char *serverIpAddress);
 void *handleReceivedMessage(void *arg);
 int startReceivingThread(void);
-void handleUserInput(void);
+void handleUserInput(char * userName, char* clientIP);
 void cleanup(void);
 void getLocalIP(int sockfd, char *ipBuffer, size_t bufferSize);
 void splitMessage(const char *fullString, char *firstPart, char *secondPart);
@@ -223,8 +233,9 @@ void sendProtocolMessage(const char *message)
     }
 }
 
-void handleUserInput()
+void handleUserInput(char * clientName, char* clientIP)
 {
+    //clientIP is now available to send to the server or to be used to verify the broadcast.
     char sendBuffer[MAX_MESSAGE_SIZE] = {0};
     int userInputIndex = 0;
     int currentCharacterAscii;
@@ -247,7 +258,7 @@ void handleUserInput()
             char part2[MAX_PART_LEN + 1] = {"0"};
             
             // Hardcoded username "Chris"
-            const char *username = "Chris";
+            const char *username = clientName;
             if (len <= MAX_PART_LEN)
             {
                 // Single message: MESSAGECOUNT 0.
@@ -296,11 +307,51 @@ void cleanup()
     endwin();
 }
 
-int main()
+
+void check_host_name(int hostname) { //This function returns host name for local computer
+    if (hostname == -1) {
+       perror("gethostname");
+       exit(1);
+    }
+ }
+ void check_host_entry(struct hostent * hostentry) { //find host info from host name
+    if (hostentry == NULL){
+       perror("gethostbyname");
+       exit(1);
+    }
+ }
+ void IP_formatter(char *IPbuffer) { //convert IP string to dotted decimal format
+    if (NULL == IPbuffer) {
+       perror("inet_ntoa");
+       exit(1);
+    }
+ }
+
+
+int main(int argc, char* argv[])
 {
+    //Used for getting clients own IP to send to server, or check IP on broadcast msg...
+    char host[256];
+    char *clientIP;
+    struct hostent *host_entry;
+    int hostname;
+    hostname = gethostname(host, sizeof(host)); //find the host name
+    check_host_name(hostname);
+    host_entry = gethostbyname(host); //find host information
+    check_host_entry(host_entry);
+    clientIP = inet_ntoa(*((struct in_addr*) host_entry->h_addr_list[0])); //Convert into IP string
+    //printf("Current Host Name: %s\n", host);
+    //printf("Host IP: %s\n", clientIP);
+    //End of clients IP get***************************
+
+
+    char userName[6] = {0};
+    char serverIP[16] = {0};
+    strcpy(userName,argv[1] + 5); //Only want to parse after the -user
+    strcpy(serverIP, argv[2] + 7); //Only want to parse after the -server
     initializeNcursesWindows();
 
-    if (connectToServer("127.0.0.1") < 0)
+    if (connectToServer(serverIP) < 0)
     {
         wprintw(messageWindow, "Connect failed: %s\n", strerror(errno));
         wrefresh(messageWindow);
@@ -311,7 +362,7 @@ int main()
     wprintw(messageWindow, "Connected to server.\n");
     wrefresh(messageWindow);
     startReceivingThread();
-    handleUserInput();
+    handleUserInput(userName, clientIP);
     cleanup();
     return 0;
 }
