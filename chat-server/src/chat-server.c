@@ -9,22 +9,11 @@
  * to ALL connected clients (including the sender).
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <pthread.h>
-#include <ctype.h>
-#include "../../Common/inc/common.h"
+
 #include "../inc/chat-server.h"
 
 // common.h
-#define PORT 8888
+// #define PORT 8888
 
 // chat-server.h
 #define MAX_CLIENTS 10
@@ -133,7 +122,7 @@ int initializeListener()
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
-    serverAddress.sin_port = htons(PORT);
+    serverAddress.sin_port = htons(SERVER_PORT);
 
     if (bind(listenSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
@@ -332,8 +321,6 @@ void *clientHandler(void *clientSocketPointer)
 
 int main()
 {
-
-    printf("Hello test: %s", COMMON_TEST);
     int listeningSocket = initializeListener();
 
     // Initialize the global clientSocketList array.
@@ -342,7 +329,7 @@ int main()
         clientSocketList[i] = -1;
     }
 
-    printf("Server listening on port %d\n", PORT);
+    printf("Server listening on port %d\n", SERVER_PORT);
 
     // Main loop: accept new connections.
     while (1)

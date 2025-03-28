@@ -14,23 +14,10 @@
  * matches its own. If so, it appends a plus sign (+) to the end of the message.
  */
 
-#include <ncurses.h>
-#include <string.h>
-#include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <netdb.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include "../../Common/inc/common.h"
 #include "../inc/chat-client.h"
 
 // some of these belong in the common.h file
-#define SERVER_PORT 8888      // Port number of chat server
+// #define SERVER_PORT 8888      // Port number of chat server
 #define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
 #define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
 #define MAX_PART_LEN 40       // Maximum characters per message part

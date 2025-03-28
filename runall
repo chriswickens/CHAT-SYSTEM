@@ -1,8 +1,10 @@
 #!/bin/bash
 echo "Running client AND server side by side..."
-xfce4-terminal --geometry=80x24+0+0 --command="make clean"
 
-xfce4-terminal --geometry=80x24+0+0 --command="make"
+xfce4-terminal --geometry=80x24+0+0 --command="make clean"
+sleep 2
+
+xfce4-terminal --geometry=80x24+0+0 --command="make all"
 sleep 2
 
 # Launch the server terminal at position (0,0)
