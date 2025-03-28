@@ -22,13 +22,13 @@
 // #define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
 // #define MAX_PART_LEN 40       // Maximum characters per message part
 
-int socketFileDescriptor;                                                            // Global socket descriptor
-WINDOW *messageWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle; // ncurses windows for chat display and input
-char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];                                         // Buffer for incoming messages
+int socketFileDescriptor;                                                                     // Global socket descriptor
+WINDOW *receivedMessagesWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle; // ncurses windows for chat display and input
+char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];                                                  // Buffer for incoming messages
 
 char clientIP[INET_ADDRSTRLEN]; // Stores the client's IP address
 
-// Function prototypes.
+// Function prototypes
 // These belong in the chat-client.h file
 
 // SOME FUNCTION PROTOTYPES ARE MISSING!
@@ -45,7 +45,7 @@ void checkHostName(int hostname);
 void checkHostEntryDetails(struct hostent *hostentry);
 void ipAddressFormatter(char *IPbuffer);
 
-// Get the local IP address from the connected socket.
+// Get the local IP address from the connected socket
 void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize)
 {
     struct sockaddr_in address;
@@ -60,7 +60,7 @@ void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize)
     }
 }
 
-// Splitting function based on the provided algorithm.
+// Splitting function based on the provided algorithm
 void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 {
     int fullStringLength = strlen(fullString);
@@ -182,43 +182,47 @@ void initializeNcursesWindows(void)
 
     /*
     Declared windows:
-    *messageWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle;
+    *receivedMessagesWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle;
 
     */
     initscr();
     cbreak();
     noecho();
-    // Start color functionality
+
+    // Allow coloUrs to be used
     start_color();
 
-    // Define color pairs
+    // Test pair of colours
     init_pair(1, COLOR_RED, COLOR_BLACK); // Text color: RED, Background color: BLACK
 
     int height, width;
     getmaxyx(stdscr, height, width);
 
-    // Create a title window that occupies the top 3 rows.
+    // Create the title for the received messages
     receivedTitle = newwin(3, width, 0, 0);
     wbkgd(receivedTitle, COLOR_PAIR(1));
 
     // Box for the message window
-    boxMsgWindow = newwin(12, width - 1, 3, 0);
+    boxMsgWindow = newwin(13, width, 3, 0);
 
-    // Create the message window just below the title window.
-    messageWindow = newwin(10, width - 4, 4, 1);
+    // Window to display the received messages
+    receivedMessagesWindow = newwin(11, width - 4, 4, 1);
 
+    // Create the title window for the user input
     inputTitle = newwin(3, width, height - 6, 0);
-    // Create the user input window at the bottom.
+
+    // Create the user input window
     userInputWindow = newwin(3, width, height - 3, 0);
 
-    // Tell ncurses not to bother moving the hardware cursor in messageWindow:
-    leaveok(messageWindow, TRUE);
+    // Dont touch the cursor in the received messages window
+    leaveok(receivedMessagesWindow, TRUE);
 
-    // Tell ncurses we do want to track the cursor in userInputWindow:
+    // Keep the cursor in the user input area
     leaveok(userInputWindow, FALSE);
 
-    // Set scroll and boxes as needed.
-    scrollok(messageWindow, TRUE);
+    // This ensures that when the 10 message limit is reached in the received messages window
+    // That the window will scroll to show the new messages (without this they will NOT display properly!)
+    scrollok(receivedMessagesWindow, TRUE);
 
     // Box to put the received messages inside of
     box(boxMsgWindow, 0, 0);
@@ -233,14 +237,17 @@ void initializeNcursesWindows(void)
     box(userInputWindow, 0, 0);
 
     // Display title text.
-    mvwprintw(receivedTitle, 1, 1, "NCURSES SUCKS MY BUTT");
+    
+    mvwprintw(receivedTitle, 1, 1, CHAT_TITLE);
     wrefresh(receivedTitle);
     wrefresh(boxMsgWindow);
 
-    // Refresh the other windows.
-    mvwprintw(inputTitle, 1, 1, "USER INPUT");
+    // Refresh the other windows
+    mvwprintw(inputTitle, 1, 1, "============= USER INPUT =============");
     wrefresh(inputTitle);
-    wrefresh(messageWindow);
+    wrefresh(receivedMessagesWindow);
+
+    // Draw the cursor when initializing, because ncurses works so well
     mvwprintw(userInputWindow, 1, 1, "> ");
     wrefresh(userInputWindow);
     nodelay(userInputWindow, TRUE);
@@ -286,7 +293,7 @@ int connectToServer(const char *serverIpAddress)
         close(socketFileDescriptor);
         return -1;
     }
-    // Get the client's IP address after connecting.
+    // Get the client's IP address after connecting
     getLocalIP(socketFileDescriptor, clientIP, sizeof(clientIP));
     return 0;
 }
@@ -301,32 +308,32 @@ void *handleReceivedMessage(void *arg)
         {
             receiveBuffer[numberOfBytesRead] = '\0';
 
-            // Check if the received message starts with our clientIP.
+            // Check if the received message starts with our clientIP
             if (strncmp(receiveBuffer, clientIP, strlen(clientIP)) == 0)
             {
                 char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 2]; // extra space for plus sign and null terminator
                 snprintf(displayMessage, sizeof(displayMessage), "%s+", receiveBuffer);
-                wprintw(messageWindow, "%s\n", displayMessage);
+                wprintw(receivedMessagesWindow, "%s\n", displayMessage);
             }
             else
             {
-                wprintw(messageWindow, "%s\n", receiveBuffer);
+                wprintw(receivedMessagesWindow, "%s\n", receiveBuffer);
             }
-            wrefresh(messageWindow);
+            wrefresh(receivedMessagesWindow);
             wmove(userInputWindow, 1, 3); // Move cursor to row 1, column 3 of the input window (after your input marker)
             curs_set(1);                  // Ensure the cursor is visible
             wrefresh(userInputWindow);    // Refresh the input window to update the cursor position
         }
         else if (numberOfBytesRead == 0)
         {
-            wprintw(messageWindow, "Server disconnected.\n");
-            wrefresh(messageWindow);
+            wprintw(receivedMessagesWindow, "Server disconnected.\n");
+            wrefresh(receivedMessagesWindow);
             break;
         }
         else if (errno != EAGAIN && errno != EWOULDBLOCK)
         {
-            wprintw(messageWindow, "handleReceivedMessage() : Read error: %s\n", strerror(errno));
-            wrefresh(messageWindow);
+            wprintw(receivedMessagesWindow, "handleReceivedMessage() : Read error: %s\n", strerror(errno));
+            wrefresh(receivedMessagesWindow);
             break;
         }
 
@@ -353,8 +360,8 @@ void sendProtocolMessage(const char *message)
     int len = strlen(message);
     if (write(socketFileDescriptor, message, len) < 0)
     {
-        wprintw(messageWindow, "Failed to send message: %s\n", strerror(errno));
-        wrefresh(messageWindow);
+        wprintw(receivedMessagesWindow, "Failed to send message: %s\n", strerror(errno));
+        wrefresh(receivedMessagesWindow);
     }
 }
 
@@ -428,7 +435,7 @@ void handleUserInput(char *clientName, char *clientIP)
 void cleanup()
 {
     close(socketFileDescriptor);
-    delwin(messageWindow);
+    delwin(receivedMessagesWindow);
     delwin(userInputWindow);
     endwin();
 }
@@ -510,22 +517,22 @@ int main(int argc, char *argv[])
 
     if (connectToServer(serverIP) < 0)
     {
-        wprintw(messageWindow, "Connect failed: %s\n", strerror(errno));
-        wrefresh(messageWindow);
+        wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
+        wrefresh(receivedMessagesWindow);
         cleanup();
         exit(EXIT_FAILURE);
     }
 
-    // wprintw(messageWindow, "Connected to server.\n");
+    // wprintw(receivedMessagesWindow, "Connected to server.\n");
 
     // Display host details from struct
-    // wprintw(messageWindow, "DEBUG: IP: %s\n", clientIP);
+    // wprintw(receivedMessagesWindow, "DEBUG: IP: %s\n", clientIP);
 
     // This is what will need to be used when to get the server HOST NAME (non-ip)
-    // wprintw(messageWindow, "Host Name: %s\n", hostDetails->h_name);
-    // wprintw(messageWindow, "Host ALIASES: %s\n", hostDetails->h_aliases);
+    // wprintw(receivedMessagesWindow, "Host Name: %s\n", hostDetails->h_name);
+    // wprintw(receivedMessagesWindow, "Host ALIASES: %s\n", hostDetails->h_aliases);
 
-    wrefresh(messageWindow);
+    wrefresh(receivedMessagesWindow);
     startReceivingThread();
     handleUserInput(userName, clientIP);
     cleanup();
