@@ -16,8 +16,8 @@
 // #define PORT 8888
 
 // chat-server.h
-#define MAX_CLIENTS 10
-#define MAX_MESSAGE_SIZE 128 // Increased size to allow for protocol overhead
+// #define MAX_CLIENTS 10
+// #define MAX_MESSAGE_SIZE 128 // Increased size to allow for protocol overhead
 
 // Global array for connected client sockets.
 int clientSocketList[MAX_CLIENTS];
@@ -90,6 +90,7 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
         // }
         strncpy(messageText, token, sizeof(messageText) - 1);
         printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MESSAGE: %s\n", messageText);
+        printf("Literal Message Size: %i\n", strlen(messageText));
     }
 
     // Format the final broadcast message.
@@ -225,11 +226,11 @@ void broadcastChatMessage(char *messageToBroadcast, int senderSocket)
 
 void processClientMessage(int clientSocket)
 {
-    char incomingMessage[MAX_MESSAGE_SIZE];
+    char incomingMessage[MAX_PROTOL_MESSAGE_SIZE];
 
     while (1)
     {
-        int numberOfBytesRead = read(clientSocket, incomingMessage, MAX_MESSAGE_SIZE - 1);
+        int numberOfBytesRead = read(clientSocket, incomingMessage, MAX_PROTOL_MESSAGE_SIZE - 1);
         if (numberOfBytesRead > 0)
         {
             incomingMessage[numberOfBytesRead] = '\0';

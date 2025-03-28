@@ -1,17 +1,10 @@
 #ifndef CHAT_SERVER_H
 #define CHAT_SERVER_H
 
-
-
-#include <fcntl.h>
-// #include <sys/types.h>
-#include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <pthread.h>
-
+// #include <fcntl.h>
 #include "../../Common/inc/common.h"
 
-
 // Code here
+#define MAX_CLIENTS 10
 
 #endif // CHAT_SERVER_H

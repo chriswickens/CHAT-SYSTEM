@@ -10,9 +10,11 @@
 #include <netinet/in.h>
 #include <netinet/in.h>
 #include <pthread.h>
-
+#include <sys/socket.h>
 
 // Your code here
 #define SERVER_PORT 8888
+
+#define MAX_PROTOL_MESSAGE_SIZE 128
 
 #endif

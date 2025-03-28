@@ -18,13 +18,13 @@
 
 // some of these belong in the common.h file
 // #define SERVER_PORT 8888      // Port number of chat server
-#define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
-#define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
-#define MAX_PART_LEN 40       // Maximum characters per message part
+// #define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
+// #define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
+// #define MAX_PART_LEN 40       // Maximum characters per message part
 
 int socketFileDescriptor;                // Global socket descriptor
 WINDOW *messageWindow, *userInputWindow; // ncurses windows for chat display and input
-char receiveBuffer[MAX_PROTOCOL_SIZE];   // Buffer for incoming messages
+char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];   // Buffer for incoming messages
 
 char clientIP[INET_ADDRSTRLEN]; // Stores the client's IP address
 
@@ -58,15 +58,15 @@ void getLocalIP(int sockfd, char *ipBuffer, size_t bufferSize)
 void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 {
     int fullStringLength = strlen(fullString);
-    if (fullStringLength <= MAX_PART_LEN)
+    if (fullStringLength <= CLIENT_MSG_PART_LENGTH)
     {
-        strncpy(firstPart, fullString, MAX_PART_LEN);
-        firstPart[MAX_PART_LEN] = '\0';
+        strncpy(firstPart, fullString, CLIENT_MSG_PART_LENGTH);
+        firstPart[CLIENT_MSG_PART_LENGTH] = '\0';
         secondPart[0] = '\0';
         return;
     }
-    int minSplit = fullStringLength - MAX_PART_LEN;
-    int maxSplit = MAX_PART_LEN;
+    int minSplit = fullStringLength - CLIENT_MSG_PART_LENGTH;
+    int maxSplit = CLIENT_MSG_PART_LENGTH;
     int midPoint = fullStringLength / 2;
     int splitIndex = -1;
     for (int offset = 0; offset <= (maxSplit - minSplit); offset++)
@@ -91,8 +91,11 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
         strncpy(firstPart, fullString, splitIndex);
         firstPart[splitIndex] = '\0';
         int secondLen = fullStringLength - (splitIndex + 1);
-        if (secondLen > MAX_PART_LEN)
-            secondLen = MAX_PART_LEN;
+        if (secondLen > CLIENT_MSG_PART_LENGTH)
+        {
+            secondLen = CLIENT_MSG_PART_LENGTH;
+        }
+            
         strncpy(secondPart, fullString + splitIndex + 1, secondLen);
         secondPart[secondLen] = '\0';
     }
@@ -101,8 +104,11 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
         strncpy(firstPart, fullString, splitIndex);
         firstPart[splitIndex] = '\0';
         int secondLen = fullStringLength - splitIndex;
-        if (secondLen > MAX_PART_LEN)
-            secondLen = MAX_PART_LEN;
+        if (secondLen > CLIENT_MSG_PART_LENGTH)
+        {
+             secondLen = CLIENT_MSG_PART_LENGTH;
+        }
+           
         strncpy(secondPart, fullString + splitIndex, secondLen);
         secondPart[secondLen] = '\0';
     }
@@ -158,7 +164,7 @@ void *handleReceivedMessage(void *arg)
     (void)arg;
     while (1)
     {
-        ssize_t numberOfBytesRead = read(socketFileDescriptor, receiveBuffer, MAX_PROTOCOL_SIZE - 1);
+        ssize_t numberOfBytesRead = read(socketFileDescriptor, receiveBuffer, MAX_PROTOL_MESSAGE_SIZE - 1);
         if (numberOfBytesRead > 0)
         {
             receiveBuffer[numberOfBytesRead] = '\0';
@@ -166,7 +172,7 @@ void *handleReceivedMessage(void *arg)
             // Check if the received message starts with our clientIP.
             if (strncmp(receiveBuffer, clientIP, strlen(clientIP)) == 0)
             {
-                char displayMessage[MAX_PROTOCOL_SIZE + 2]; // extra space for plus sign and null terminator
+                char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 2]; // extra space for plus sign and null terminator
                 snprintf(displayMessage, sizeof(displayMessage), "%s+", receiveBuffer);
                 wprintw(messageWindow, "%s\n", displayMessage);
             }
@@ -218,7 +224,7 @@ void sendProtocolMessage(const char *message)
 void handleUserInput(char *clientName, char *clientIP)
 {
     // clientIP is now available to send to the server or to be used to verify the broadcast.
-    char sendBuffer[MAX_MESSAGE_SIZE] = {0};
+    char sendBuffer[CLIENT_MAX_MSG_SIZE] = {0};
     int userInputIndex = 0;
     int currentCharacterAscii;
 
@@ -235,13 +241,13 @@ void handleUserInput(char *clientName, char *clientIP)
         {
             sendBuffer[userInputIndex] = '\0';
             int len = strlen(sendBuffer);
-            char protocolMsg[MAX_PROTOCOL_SIZE];
-            char part1[MAX_PART_LEN + 1] = {"0"};
-            char part2[MAX_PART_LEN + 1] = {"0"};
+            char protocolMsg[MAX_PROTOL_MESSAGE_SIZE];
+            char part1[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
+            char part2[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
 
             // Hardcoded username "Chris"
             const char *username = clientName;
-            if (len <= MAX_PART_LEN)
+            if (len <= CLIENT_MSG_PART_LENGTH)
             {
                 // Single message: MESSAGECOUNT 0.
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|0|%s", clientIP, username, sendBuffer);
@@ -268,7 +274,7 @@ void handleUserInput(char *clientName, char *clientIP)
         }
         else if (currentCharacterAscii != '\n')
         {
-            if (userInputIndex < MAX_MESSAGE_SIZE - 1)
+            if (userInputIndex < CLIENT_MAX_MSG_SIZE - 1)
             {
                 sendBuffer[userInputIndex++] = currentCharacterAscii;
                 sendBuffer[userInputIndex] = '\0';
