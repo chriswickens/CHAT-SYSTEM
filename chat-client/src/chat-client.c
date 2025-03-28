@@ -189,15 +189,22 @@ void initializeNcursesWindows(void)
     cbreak();
     noecho();
 
+    // Get the height/width details from the terminal
+    int height, width;
+    getmaxyx(stdscr, height, width);
+
     // Allow coloUrs to be used
     start_color();
 
     // Test pair of colours
-    init_pair(1, COLOR_RED, COLOR_BLACK); // Text color: RED, Background color: BLACK
+    init_pair(1, COLOR_RED, COLOR_MAGENTA); // Text color: RED, Background color: BLACK
+    init_pair(2, COLOR_WHITE, COLOR_BLUE);
+    init_pair(3, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(4, COLOR_CYAN, COLOR_GREEN);
 
-    int height, width;
-    getmaxyx(stdscr, height, width);
-
+    /*
+    Received Messages and Title Area
+    */
     // Create the title for the received messages
     receivedTitle = newwin(3, width, 0, 0);
     wbkgd(receivedTitle, COLOR_PAIR(1));
@@ -206,19 +213,11 @@ void initializeNcursesWindows(void)
     boxMsgWindow = newwin(13, width, 3, 0);
 
     // Window to display the received messages
-    receivedMessagesWindow = newwin(11, width - 4, 4, 1);
-
-    // Create the title window for the user input
-    inputTitle = newwin(3, width, height - 6, 0);
-
-    // Create the user input window
-    userInputWindow = newwin(3, width, height - 3, 0);
+    receivedMessagesWindow = newwin(11, width - 2, 4, 1);
+    wbkgd(receivedMessagesWindow, COLOR_PAIR(2));
 
     // Dont touch the cursor in the received messages window
     leaveok(receivedMessagesWindow, TRUE);
-
-    // Keep the cursor in the user input area
-    leaveok(userInputWindow, FALSE);
 
     // This ensures that when the 10 message limit is reached in the received messages window
     // That the window will scroll to show the new messages (without this they will NOT display properly!)
@@ -230,31 +229,47 @@ void initializeNcursesWindows(void)
     // Box for the received TITLE
     box(receivedTitle, 0, 0);
 
+    // Print title message for received messages title
+    mvwprintw(receivedTitle, 1, 1, CHAT_TITLE);
+
+    // Refresh Received Messages display
+    wrefresh(receivedTitle);
+    wrefresh(boxMsgWindow);
+    wrefresh(receivedMessagesWindow);
+
+    /*
+    Input window and TITLE area
+    */
+    // Create the title window for the user input
+    inputTitle = newwin(3, width, height - 6, 0);
+    wbkgd(inputTitle, COLOR_PAIR(3));
+
+    // Create the user input window
+    userInputWindow = newwin(3, width, height - 3, 0);
+    wbkgd(userInputWindow, COLOR_PAIR(4));
+
+    // Keep the cursor in the user input area
+    leaveok(userInputWindow, FALSE);
+
     // Box for the input title
     box(inputTitle, 0, 0);
 
     // Box for the user input
     box(userInputWindow, 0, 0);
 
-    // Display title text.
-    
-    mvwprintw(receivedTitle, 1, 1, CHAT_TITLE);
-    wrefresh(receivedTitle);
-    wrefresh(boxMsgWindow);
-
-    // Refresh the other windows
+    // Refresh Input title to display text
     mvwprintw(inputTitle, 1, 1, "============= USER INPUT =============");
-    wrefresh(inputTitle);
-    wrefresh(receivedMessagesWindow);
 
     // Draw the cursor when initializing, because ncurses works so well
     mvwprintw(userInputWindow, 1, 1, "> ");
     wrefresh(userInputWindow);
+    wrefresh(inputTitle);
     nodelay(userInputWindow, TRUE);
 
-    wmove(userInputWindow, 1, 3); // Move cursor to row 1, column 3 of the input window (after your input marker)
-    curs_set(1);                  // Ensure the cursor is visible
-    wrefresh(userInputWindow);    // Refresh the input window to update the cursor position
+    // Move cursor to row 1, column 3 of the input window
+    wmove(userInputWindow, 1, 3);
+    curs_set(1);               // Ensure the cursor is visible
+    wrefresh(userInputWindow); // Refresh the input window to update the cursor position
 }
 
 int connectToServer(const char *serverIpAddress)
