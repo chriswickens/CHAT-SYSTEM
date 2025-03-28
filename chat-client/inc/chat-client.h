@@ -11,6 +11,8 @@
 // Code here
 #define CLIENT_INPUT_MARKER ">"
 
+#define TOO_FEW_ARGUMENTS "ERROR: Too few arguments!\n"
+
 #define CLIENT_MAX_MSG_SIZE 81 // Message size used for MAX in client
 #define CLIENT_MSG_PART_LENGTH 40
 

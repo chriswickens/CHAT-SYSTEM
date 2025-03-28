@@ -7,7 +7,7 @@
  * If a message exceeds 40 characters, it is split into two parts:
  *   MESSAGECOUNT 1 for the first part, and MESSAGECOUNT 2 for the second.
  * The server then parses this protocol message and broadcasts
- * the formatted message (e.g., 127.0.0.1 [Chris] "FUCK THIS ALL")
+ * the formatted message (e.g., 127.0.0.1 [Chris] MESSAGE)
  * to every connected client (including the sender).
  *
  * When receiving a message, the client checks if the IP in the message
@@ -495,6 +495,30 @@ void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int user
 int main(int argc, char *argv[])
 {
 
+    // double check user name size
+    char userName[6] = {0};
+    char serverIP[16] = {0};
+
+    char errorMessage[256];
+    int validArguments = 1;
+
+    if (argc != 3)
+    {
+        validArguments = 0;
+        strcpy(errorMessage, TOO_FEW_ARGUMENTS);
+    }
+
+    else
+    {
+        // Check if the first argument is over 10 characters
+        if(strlen(argv[1]) > 10)
+        {
+            printf("User name too long!\n");
+            return -1;
+        }
+        strcpy(userName, argv[1] + 5); // Only want to parse after the -user
+        strcpy(serverIP, argv[2] + 7); // Only want to parse after the -server
+    }
     /*
 
         TO DO: Need to check if when running the program NO arguments are provided!
@@ -502,54 +526,58 @@ int main(int argc, char *argv[])
 
     */
 
-    // Used for getting clients own IP to send to server, or check IP on broadcast msg...
-    char host[256];
-    char *clientIP;
-
-    struct hostent *hostDetails;
-    int hostname;
-    hostname = gethostname(host, sizeof(host)); // find the host name
-
-    // Rework this function to check for the host name
-    // checkHostName(hostname);
-
-    hostDetails = gethostbyname(host); // find host information
-    // checkHostEntryDetails(hostDetails);
-
-    clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0])); // Convert into IP string
-    // printf("Current Host Name: %s\n", host);
-    // printf("Host IP: %s\n", clientIP);
-    // End of clients IP get***************************
-
-    // double check user name size
-    char userName[6] = {0};
-    char serverIP[16] = {0};
-
-    strcpy(userName, argv[1] + 5); // Only want to parse after the -user
-    strcpy(serverIP, argv[2] + 7); // Only want to parse after the -server
-
-    initializeNcursesWindows();
-
-    if (connectToServer(serverIP) < 0)
+    // If there are valid arguments
+    if (validArguments)
     {
-        wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
+        // Used for getting clients own IP to send to server, or check IP on broadcast msg...
+        char host[256];
+        char *clientIP;
+
+        struct hostent *hostDetails;
+        int hostname;
+        hostname = gethostname(host, sizeof(host)); // find the host name
+
+        // Rework this function to check for the host name
+        // checkHostName(hostname);
+
+        hostDetails = gethostbyname(host); // find host information
+        // checkHostEntryDetails(hostDetails);
+
+        clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0])); // Convert into IP string
+        // printf("Current Host Name: %s\n", host);
+        // printf("Host IP: %s\n", clientIP);
+        // End of clients IP get***************************
+
+
+
+        initializeNcursesWindows();
+
+        if (connectToServer(serverIP) < 0)
+        {
+            wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
+            wrefresh(receivedMessagesWindow);
+            cleanup();
+            exit(EXIT_FAILURE);
+        }
+
+        // wprintw(receivedMessagesWindow, "Connected to server.\n");
+
+        // Display host details from struct
+        // wprintw(receivedMessagesWindow, "DEBUG: IP: %s\n", clientIP);
+
+        // This is what will need to be used when to get the server HOST NAME (non-ip)
+        wprintw(receivedMessagesWindow, "Host Name: %s\n", hostDetails->h_name);
+
         wrefresh(receivedMessagesWindow);
+        startReceivingThread();
+        handleUserInput(userName, clientIP);
         cleanup();
-        exit(EXIT_FAILURE);
+        return 0;
     }
 
-    // wprintw(receivedMessagesWindow, "Connected to server.\n");
-
-    // Display host details from struct
-    // wprintw(receivedMessagesWindow, "DEBUG: IP: %s\n", clientIP);
-
-    // This is what will need to be used when to get the server HOST NAME (non-ip)
-    // wprintw(receivedMessagesWindow, "Host Name: %s\n", hostDetails->h_name);
-    // wprintw(receivedMessagesWindow, "Host ALIASES: %s\n", hostDetails->h_aliases);
-
-    wrefresh(receivedMessagesWindow);
-    startReceivingThread();
-    handleUserInput(userName, clientIP);
-    cleanup();
-    return 0;
+    else
+    {
+        printf("ERROR: %s", errorMessage);
+        return -1;
+    }
 }
