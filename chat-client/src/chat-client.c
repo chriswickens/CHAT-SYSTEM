@@ -522,7 +522,7 @@ int main(int argc, char *argv[])
 
     char userName[6];
     char serverName[256] = "Ip address used";
-    char serverIp[17] = "Server name used";
+    // char serverIp[17] = "Server name used";
 
     // Check if arg count is valid
     if (argc != 3)
@@ -585,7 +585,7 @@ int main(int argc, char *argv[])
                 if (part1 >= 0 && part1 < 256 && part2 >= 0 && part2 < 256 && part3 >= 0 && part3 < 256 && part4 >= 0 && part4 < 256)
                 {
                     // Ip address is valid
-                    strcpy(serverIp, argv[2]);
+                    strcpy(serverName, argv[2]);
                 }
                 else
                 {
@@ -617,7 +617,7 @@ int main(int argc, char *argv[])
 
     printf("User Name: %s\n", userName);
     printf("Server Name: %s\n", serverName);
-    printf("Socket Ip: %s\n", serverIp);
+    printf("Socket Ip: %s\n", serverName);
 
     // THIS WAS CHANGED: Removed the gethostbyname block and replaced it with a simple gethostname() call.
     char host[256];
@@ -625,7 +625,7 @@ int main(int argc, char *argv[])
 
     initializeNcursesWindows();
 
-    if (connectToServer(serverIp) < 0)
+    if (connectToServer(serverName) < 0)
     {
         wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
         wrefresh(receivedMessagesWindow);
@@ -636,6 +636,7 @@ int main(int argc, char *argv[])
     // THIS WAS CHANGED: Use 'host' from gethostname() instead of hostDetails->h_name.
     wprintw(receivedMessagesWindow, "Host Name: %s\n", host);
     wprintw(receivedMessagesWindow, "CLIENT IP: %s\n", clientIP);
+    wprintw(receivedMessagesWindow, "Server : %s\n", serverName);
     wrefresh(receivedMessagesWindow);
     startReceivingThread();
     handleUserInput(userName, clientIP);
