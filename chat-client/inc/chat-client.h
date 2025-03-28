@@ -4,7 +4,7 @@
 
 #include <ncurses.h>
 // #include <netdb.h>
-#include <arpa/inet.h>
+
 #include "../../Common/inc/common.h"
 
 

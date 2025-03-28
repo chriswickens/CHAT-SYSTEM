@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <ctype.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 
 // Your code here
 #define SERVER_PORT 8888

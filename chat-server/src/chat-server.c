@@ -34,7 +34,7 @@ void *clientHandler(void *clientSocketPointer);
 
 // This function parses the incoming protocol message and
 // then broadcasts a formatted message in the form:
-//   IPADDRESS [USERNAME] "MESSAGE"
+//   IPADDRESS [USERNAME] MESSAGE
 void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSocket)
 {
     printf("\n-------Parsing INCOMING message-------\n");
@@ -43,13 +43,13 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     int messageCount = -1; // To check the message count from client
     char messageText[256] = ""; // To store the message text from the client
 
-    char temp[256]; // Temp storage when splitting the message
-    strncpy(temp, protocolMessage, sizeof(temp) - 1);
-    temp[sizeof(temp) - 1] = '\0';
+    char temporaryMessageSpace[256]; // Temp storage when splitting the message
+    strncpy(temporaryMessageSpace, protocolMessage, sizeof(temporaryMessageSpace) - 1);
+    temporaryMessageSpace[sizeof(temporaryMessageSpace) - 1] = '\0';
 
     // Tokenize using "|" as the delimiter.
     // Pull out the IP address
-    char *token = strtok(temp, "|");
+    char *token = strtok(temporaryMessageSpace, "|");
     if (token != NULL)
     {
 
@@ -256,39 +256,43 @@ void processClientMessage(int clientSocket)
         {
             incomingMessage[numberOfBytesRead] = '\0';
 
-            // Remove trailing whitespace
-            int end = numberOfBytesRead;
-            while (end > 0 && isspace((unsigned char)incomingMessage[end - 1]))
-            {
-                incomingMessage[end - 1] = '\0';
-                end--;
-            }
+            // // Remove trailing whitespace
+            // int end = numberOfBytesRead;
+            // while (end > 0 && isspace((unsigned char)incomingMessage[end - 1]))
+            // {
+            //     incomingMessage[end - 1] = '\0';
+            //     end--;
+            // }
 
             printf("\n------- GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() Start\n");
             // Debug print the raw protocol message.
             printf("DEBUG: Received message from socket %d (len=%d): \"%s\"\n", clientSocket, numberOfBytesRead, incomingMessage);
 
             // Extract the protocol fields to get the actual message text.
-            char temp[256];
-            strncpy(temp, incomingMessage, sizeof(temp) - 1);
-            temp[sizeof(temp) - 1] = '\0';
+            char temporaryMessageSpace[256];
+            strncpy(temporaryMessageSpace, incomingMessage, sizeof(temporaryMessageSpace) - 1);
+            temporaryMessageSpace[sizeof(temporaryMessageSpace) - 1] = '\0';
 
             // Protocol format: CLIENTIP|USERNAME|MESSAGECOUNT|"Message text"
-            char *ipField = strtok(temp, "|");
+            // Get the IP
+            char *ipField = strtok(temporaryMessageSpace, "|");
+            // Get the user name
             char *usernameField = strtok(NULL, "|");
+            // Get the message count
             char *msgCountField = strtok(NULL, "|");
+            // Get the message
             char *messageField = strtok(NULL, "|");
 
-            // Remove surrounding quotes from the messageField if present.
-            if (messageField != NULL)
-            {
-                size_t len = strlen(messageField);
-                if (len >= 2 && messageField[0] == '\"' && messageField[len - 1] == '\"')
-                {
-                    messageField[len - 1] = '\0';
-                    messageField++;
-                }
-            }
+            // // Remove surrounding quotes from the messageField if present.
+            // if (messageField != NULL)
+            // {
+            //     size_t len = strlen(messageField);
+            //     if (len >= 2 && messageField[0] == '\"' && messageField[len - 1] == '\"')
+            //     {
+            //         messageField[len - 1] = '\0';
+            //         messageField++;
+            //     }
+            // }
 
             // If the extracted message text is ">>bye<<", disconnect.
             if (messageField && strcmp(messageField, ">>bye<<") == 0)

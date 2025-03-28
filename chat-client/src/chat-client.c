@@ -22,14 +22,16 @@
 // #define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
 // #define MAX_PART_LEN 40       // Maximum characters per message part
 
-int socketFileDescriptor;                    // Global socket descriptor
-WINDOW *messageWindow, *userInputWindow;     // ncurses windows for chat display and input
-char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE]; // Buffer for incoming messages
+int socketFileDescriptor;                                                            // Global socket descriptor
+WINDOW *messageWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle; // ncurses windows for chat display and input
+char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];                                         // Buffer for incoming messages
 
 char clientIP[INET_ADDRSTRLEN]; // Stores the client's IP address
 
 // Function prototypes.
 // These belong in the chat-client.h file
+
+// SOME FUNCTION PROTOTYPES ARE MISSING!
 void initializeNcursesWindows(void);
 int connectToServer(const char *serverIpAddress);
 void *handleReceivedMessage(void *arg);
@@ -38,6 +40,10 @@ void handleUserInput(char *userName, char *clientIP);
 void cleanup(void);
 void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize);
 void splitMessage(const char *fullString, char *firstPart, char *secondPart);
+
+void checkHostName(int hostname);
+void checkHostEntryDetails(struct hostent *hostentry);
+void ipAddressFormatter(char *IPbuffer);
 
 // Get the local IP address from the connected socket.
 void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize)
@@ -171,25 +177,45 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
     }
 }
 
-void initializeNcursesWindows()
+void initializeNcursesWindows(void)
 {
-    // Necessary functions to make the ncurses stuff work
     initscr();
     cbreak();
     noecho();
 
-
     int height, width;
-    // Get the max dimensions of the window
     getmaxyx(stdscr, height, width);
 
-    messageWindow = newwin(height - 3, width, 0, 0);
+    // Create a title window that occupies the top 3 rows.
+    receivedTitle = newwin(3, width, 0, 0);
+
+    // Box for the message window
+    boxMsgWindow = newwin(13, width - 1, 3, 0);
+
+    // Create the message window just below the title window.
+    messageWindow = newwin(11, width - 4, 4, 1);
+
+    // Create the user input window at the bottom.
     userInputWindow = newwin(3, width, height - 3, 0);
+
+    // Set scroll and boxes as needed.
     scrollok(messageWindow, TRUE);
 
+    // Box to put the received messages inside of
+    box(boxMsgWindow, 0, 0);
+
+    // Box for the received TITLE
+    box(receivedTitle, 0, 0);
+
+    // Box for the user input
     box(userInputWindow, 0, 0);
-    mvwprintw(userInputWindow, 1, 1, "> ");
-    wmove(userInputWindow, 1, 3);
+
+    // Display title text.
+    mvwprintw(receivedTitle, 1, 1, "Your Title -- Site or Description Here");
+    wrefresh(receivedTitle);
+    wrefresh(boxMsgWindow);
+
+    // Refresh the other windows.
     wrefresh(messageWindow);
     wrefresh(userInputWindow);
     nodelay(userInputWindow, TRUE);
@@ -219,7 +245,7 @@ int connectToServer(const char *serverIpAddress)
     // Convert the IP from the command line argument to an IP address
     int addressResult = inet_pton(AF_INET, serverIpAddress, &serverAddress.sin_addr);
 
-    if(addressResult < 0)
+    if (addressResult < 0)
     {
         // Error out if the address was invalid
         printf("INVALID ADDRESS.");
@@ -278,12 +304,12 @@ void *handleReceivedMessage(void *arg)
 
 int startReceivingThread()
 {
-    pthread_t recvThread;
-    if (pthread_create(&recvThread, NULL, handleReceivedMessage, NULL) != 0)
+    pthread_t receivingThread;
+    if (pthread_create(&receivingThread, NULL, handleReceivedMessage, NULL) != 0)
     {
         return -1;
     }
-    pthread_detach(recvThread);
+    pthread_detach(receivingThread);
     return 0;
 }
 
@@ -319,25 +345,26 @@ void handleUserInput(char *clientName, char *clientIP)
             sendBuffer[userInputIndex] = '\0';
             int len = strlen(sendBuffer);
             char protocolMsg[MAX_PROTOL_MESSAGE_SIZE];
-            char part1[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
-            char part2[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
+            char messagePartOne[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
+            char messagePartTwo[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
 
             // Hardcoded username "Chris"
             const char *username = clientName;
             if (len <= CLIENT_MSG_PART_LENGTH)
             {
                 // Single message: MESSAGECOUNT 0.
-                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|0|%s", clientIP, username, sendBuffer);
+                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|0|%s", clientIP, clientName, sendBuffer);
                 sendProtocolMessage(protocolMsg);
             }
+
             else
             {
                 // Split the message into two parts.
-                splitMessage(sendBuffer, part1, part2);
-                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|1|%s", clientIP, username, part1);
+                splitMessage(sendBuffer, messagePartOne, messagePartTwo);
+                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|1|%s", clientIP, clientName, messagePartOne);
                 sendProtocolMessage(protocolMsg);
                 usleep(50000); // Small delay to help preserve order.
-                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|2|%s", clientIP, username, part2);
+                snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|2|%s", clientIP, clientName, messagePartTwo);
                 sendProtocolMessage(protocolMsg);
             }
             // Clear the input (do not print the sent message in the chat window).
@@ -372,7 +399,7 @@ void cleanup()
     endwin();
 }
 
-void check_host_name(int hostname)
+void checkHostName(int hostname)
 { // This function returns host name for local computer
     if (hostname == -1)
     {
@@ -380,7 +407,7 @@ void check_host_name(int hostname)
         exit(1);
     }
 }
-void check_host_entry(struct hostent *hostentry)
+void checkHostEntryDetails(struct hostent *hostentry)
 { // find host info from host name
     if (hostentry == NULL)
     {
@@ -388,7 +415,8 @@ void check_host_entry(struct hostent *hostentry)
         exit(1);
     }
 }
-void IP_formatter(char *IPbuffer)
+
+void ipAddressFormatter(char *IPbuffer)
 { // convert IP string to dotted decimal format
     if (NULL == IPbuffer)
     {
@@ -416,15 +444,15 @@ int main(int argc, char *argv[])
     hostname = gethostname(host, sizeof(host)); // find the host name
 
     // Rework this function to check for the host name
-    // check_host_name(hostname);
+    // checkHostName(hostname);
 
     hostDetails = gethostbyname(host); // find host information
-    // check_host_entry(hostDetails);
+    // checkHostEntryDetails(hostDetails);
 
     clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0])); // Convert into IP string
     // printf("Current Host Name: %s\n", host);
     // printf("Host IP: %s\n", clientIP);
-    // End of clients IP get*************************** 
+    // End of clients IP get***************************
 
     // double check user name size
     char userName[6] = {0};
@@ -443,10 +471,10 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    wprintw(messageWindow, "Connected to server.\n");
+    // wprintw(messageWindow, "Connected to server.\n");
 
     // Display host details from struct
-    wprintw(messageWindow, "DEBUG: IP: %s\n", clientIP);
+    // wprintw(messageWindow, "DEBUG: IP: %s\n", clientIP);
 
     // This is what will need to be used when to get the server HOST NAME (non-ip)
     // wprintw(messageWindow, "Host Name: %s\n", hostDetails->h_name);
