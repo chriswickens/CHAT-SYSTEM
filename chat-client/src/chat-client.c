@@ -179,24 +179,43 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 
 void initializeNcursesWindows(void)
 {
+
+    /*
+    Declared windows:
+    *messageWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle;
+
+    */
     initscr();
     cbreak();
     noecho();
+    // Start color functionality
+    start_color();
+
+    // Define color pairs
+    init_pair(1, COLOR_RED, COLOR_BLACK); // Text color: RED, Background color: BLACK
 
     int height, width;
     getmaxyx(stdscr, height, width);
 
     // Create a title window that occupies the top 3 rows.
     receivedTitle = newwin(3, width, 0, 0);
+    wbkgd(receivedTitle, COLOR_PAIR(1));
 
     // Box for the message window
-    boxMsgWindow = newwin(13, width - 1, 3, 0);
+    boxMsgWindow = newwin(12, width - 1, 3, 0);
 
     // Create the message window just below the title window.
-    messageWindow = newwin(11, width - 4, 4, 1);
+    messageWindow = newwin(10, width - 4, 4, 1);
 
+    inputTitle = newwin(3, width, height - 6, 0);
     // Create the user input window at the bottom.
     userInputWindow = newwin(3, width, height - 3, 0);
+
+    // Tell ncurses not to bother moving the hardware cursor in messageWindow:
+    leaveok(messageWindow, TRUE);
+
+    // Tell ncurses we do want to track the cursor in userInputWindow:
+    leaveok(userInputWindow, FALSE);
 
     // Set scroll and boxes as needed.
     scrollok(messageWindow, TRUE);
@@ -207,18 +226,28 @@ void initializeNcursesWindows(void)
     // Box for the received TITLE
     box(receivedTitle, 0, 0);
 
+    // Box for the input title
+    box(inputTitle, 0, 0);
+
     // Box for the user input
     box(userInputWindow, 0, 0);
 
     // Display title text.
-    mvwprintw(receivedTitle, 1, 1, "Your Title -- Site or Description Here");
+    mvwprintw(receivedTitle, 1, 1, "NCURSES SUCKS MY BUTT");
     wrefresh(receivedTitle);
     wrefresh(boxMsgWindow);
 
     // Refresh the other windows.
+    mvwprintw(inputTitle, 1, 1, "USER INPUT");
+    wrefresh(inputTitle);
     wrefresh(messageWindow);
+    mvwprintw(userInputWindow, 1, 1, "> ");
     wrefresh(userInputWindow);
     nodelay(userInputWindow, TRUE);
+
+    wmove(userInputWindow, 1, 3); // Move cursor to row 1, column 3 of the input window (after your input marker)
+    curs_set(1);                  // Ensure the cursor is visible
+    wrefresh(userInputWindow);    // Refresh the input window to update the cursor position
 }
 
 int connectToServer(const char *serverIpAddress)
@@ -284,6 +313,9 @@ void *handleReceivedMessage(void *arg)
                 wprintw(messageWindow, "%s\n", receiveBuffer);
             }
             wrefresh(messageWindow);
+            wmove(userInputWindow, 1, 3); // Move cursor to row 1, column 3 of the input window (after your input marker)
+            curs_set(1);                  // Ensure the cursor is visible
+            wrefresh(userInputWindow);    // Refresh the input window to update the cursor position
         }
         else if (numberOfBytesRead == 0)
         {
@@ -297,8 +329,10 @@ void *handleReceivedMessage(void *arg)
             wrefresh(messageWindow);
             break;
         }
+
         usleep(50000);
     }
+
     return NULL;
 }
 
@@ -423,6 +457,17 @@ void ipAddressFormatter(char *IPbuffer)
         perror("inet_ntoa");
         exit(1);
     }
+}
+
+void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int userInputIndex)
+{
+    werase(inputWin);
+    box(inputWin, 0, 0);
+    // Print the input marker and current user input.
+    mvwprintw(inputWin, 1, 1, "%s %s", CLIENT_INPUT_MARKER, currentBuffer);
+    // Move the cursor to the appropriate position (adjust the coordinates as needed).
+    wmove(inputWin, 1, 3 + userInputIndex);
+    wrefresh(inputWin);
 }
 
 int main(int argc, char *argv[])
