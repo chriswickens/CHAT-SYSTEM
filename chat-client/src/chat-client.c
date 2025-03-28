@@ -44,43 +44,39 @@
  void checkHostName(int hostname);
  void checkHostEntryDetails(struct hostent *hostentry);
  void ipAddressFormatter(char *IPbuffer);
- 
+  
  // THIS WAS CHANGED: Modified getLocalIP() to use a dummy UDP socket to get the external IP.
+ // THIS WAS CHANGED: Rewrote getLocalIP() to use getifaddrs() to retrieve the non-loopback IP.
+ #include <ifaddrs.h>
+ #include <arpa/inet.h>
+ 
  void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize)
  {
-     (void) socketDescriptor; // Unused in the new implementation.
-     int sock = socket(AF_INET, SOCK_DGRAM, 0);
-     if (sock < 0)
-     {
+     (void) socketDescriptor; // Not used in this implementation.
+     struct ifaddrs *ifaddr, *ifa;
+     if (getifaddrs(&ifaddr) == -1) {
          strncpy(ipBuffer, "0.0.0.0", bufferSize);
          return;
      }
-     
-     struct sockaddr_in serv;
-     memset(&serv, 0, sizeof(serv));
-     serv.sin_family = AF_INET;
-     serv.sin_addr.s_addr = inet_addr("8.8.8.8");  // Using Google DNS to determine external IP.
-     serv.sin_port = htons(53);
-     
-     if (connect(sock, (struct sockaddr *)&serv, sizeof(serv)) < 0)
-     {
-         close(sock);
-         strncpy(ipBuffer, "0.0.0.0", bufferSize);
-         return;
+     // Iterate through available network interfaces
+     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+         if (ifa->ifa_addr == NULL)
+             continue;
+         // Only consider IPv4 addresses
+         if (ifa->ifa_addr->sa_family == AF_INET) {
+             // Skip the loopback interface
+             if (strcmp(ifa->ifa_name, "lo") == 0)
+                 continue;
+             struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;
+             inet_ntop(AF_INET, &sa->sin_addr, ipBuffer, bufferSize);
+             freeifaddrs(ifaddr);
+             return;
+         }
      }
-     
-     struct sockaddr_in local;
-     socklen_t local_len = sizeof(local);
-     if (getsockname(sock, (struct sockaddr *)&local, &local_len) < 0)
-     {
-         close(sock);
-         strncpy(ipBuffer, "0.0.0.0", bufferSize);
-         return;
-     }
-     
-     inet_ntop(AF_INET, &local.sin_addr, ipBuffer, bufferSize);
-     close(sock);
+     freeifaddrs(ifaddr);
+     strncpy(ipBuffer, "0.0.0.0", bufferSize);
  }
+ 
  
  // Splitting function based on the provided algorithm
  void splitMessage(const char *fullString, char *firstPart, char *secondPart)
@@ -304,42 +300,36 @@
  
      // Setup the socket using IPv4
      socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
- 
-     // If the socket didnt work
      if (socketFileDescriptor < 0)
      {
          return -1;
      }
  
+     // THIS WAS CHANGED: Bind the socket explicitly to INADDR_ANY with an ephemeral port
+     struct sockaddr_in localAddr;
+     memset(&localAddr, 0, sizeof(localAddr));
+     localAddr.sin_family = AF_INET;
+     localAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+     localAddr.sin_port = 0;  // Let the OS choose an ephemeral port
+     if (bind(socketFileDescriptor, (struct sockaddr *)&localAddr, sizeof(localAddr)) < 0)
+     {
+         perror("bind failed");
+         close(socketFileDescriptor);
+         return -1;
+     }
+ 
      // Allocate memory to store the address information
      memset(&serverAddress, 0, sizeof(serverAddress));
-     // Setup address details
      serverAddress.sin_family = AF_INET;
-     // Setup the port
      serverAddress.sin_port = htons(SERVER_PORT);
  
-     // ADDED THIS: Try to interpret the input as an IP address.
+     // Convert the IP from the command line argument to an IP address
      int addressResult = inet_pton(AF_INET, serverIpAddress, &serverAddress.sin_addr);
-     if (addressResult == 1)
+     if (addressResult < 0)
      {
-         // Valid IP address provided; do nothing extra.
-     }
-     else
-     {
-         // ADDED THIS: The provided serverIpAddress is not in IP format.
-         // We assume it's a hostname and resolve it.
-         struct addrinfo hints, *res;
-         memset(&hints, 0, sizeof(hints));
-         hints.ai_family = AF_INET;       // Force IPv4
-         hints.ai_socktype = SOCK_STREAM;  // TCP stream sockets
- 
-         if (getaddrinfo(serverIpAddress, NULL, &hints, &res) != 0)
-         {
-             printf("Hostname resolution failed for %s.\n", serverIpAddress);
-             return -1;
-         }
-         serverAddress.sin_addr = ((struct sockaddr_in *)(res->ai_addr))->sin_addr;
-         freeaddrinfo(res);
+         // Error out if the address was invalid
+         printf("INVALID ADDRESS.");
+         return -1;
      }
  
      if (connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
@@ -352,6 +342,7 @@
      getLocalIP(socketFileDescriptor, clientIP, sizeof(clientIP));
      return 0;
  }
+ 
  
  void *handleReceivedMessage(void *arg)
  {
@@ -658,3 +649,4 @@
      cleanup();
      return 0;
  }
+ 
