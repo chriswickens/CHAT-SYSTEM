@@ -355,14 +355,7 @@ void *handleReceivedMessage(void *arg)
         time_t now;
         struct tm *timeInfo;
 
-        
-        time(&now);                 // Get system time
-        timeInfo = localtime(&now); // Convert to local time structure
 
-        // Extract hours, minutes, and seconds
-        int hours = timeInfo->tm_hour;
-        int minutes = timeInfo->tm_min;
-        int seconds = timeInfo->tm_sec;
 
         ssize_t numberOfBytesRead = read(socketFileDescriptor, receiveBuffer, MAX_PROTOL_MESSAGE_SIZE - 1);
         if (numberOfBytesRead > 0)
@@ -372,6 +365,13 @@ void *handleReceivedMessage(void *arg)
             // Check if the received message starts with our clientIP
             if (strncmp(receiveBuffer, clientIP, strlen(clientIP)) == 0)
             {
+                time(&now);                 // Get system time
+                timeInfo = localtime(&now); // Convert to local time structure
+        
+                // Extract hours, minutes, and seconds
+                int hours = timeInfo->tm_hour;
+                int minutes = timeInfo->tm_min;
+                int seconds = timeInfo->tm_sec;
                 char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20]; // extra space for plus sign and null terminator
                 receiveBuffer[24] = '<';
                 receiveBuffer[25] = '<';
@@ -380,9 +380,16 @@ void *handleReceivedMessage(void *arg)
             }
             else
             {
+                time(&now);                 // Get system time
+                timeInfo = localtime(&now); // Convert to local time structure
+        
+                // Extract hours, minutes, and seconds
+                int hours = timeInfo->tm_hour;
+                int minutes = timeInfo->tm_min;
+                int seconds = timeInfo->tm_sec;
                 char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20];
                 snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
-                wprintw(receivedMessagesWindow, "%s\n", receiveBuffer);
+                wprintw(receivedMessagesWindow, "%s\n", displayMessage);
             }
             wrefresh(receivedMessagesWindow);
             wmove(userInputWindow, 1, 3); // Move cursor to row 1, column 3 of the input window (after your input marker)
