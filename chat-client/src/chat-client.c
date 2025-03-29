@@ -355,6 +355,7 @@ void *handleReceivedMessage(void *arg)
         time_t now;
         struct tm *timeInfo;
 
+        
         time(&now);                 // Get system time
         timeInfo = localtime(&now); // Convert to local time structure
 
@@ -371,7 +372,7 @@ void *handleReceivedMessage(void *arg)
             // Check if the received message starts with our clientIP
             if (strncmp(receiveBuffer, clientIP, strlen(clientIP)) == 0)
             {
-                char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 2]; // extra space for plus sign and null terminator
+                char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20]; // extra space for plus sign and null terminator
                 receiveBuffer[24] = '<';
                 receiveBuffer[25] = '<';
                 snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
@@ -379,7 +380,8 @@ void *handleReceivedMessage(void *arg)
             }
             else
             {
-                snprintf(receiveBuffer, sizeof(receiveBuffer), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
+                char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20];
+                snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
                 wprintw(receivedMessagesWindow, "%s\n", receiveBuffer);
             }
             wrefresh(receivedMessagesWindow);
