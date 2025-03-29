@@ -379,6 +379,7 @@ void *handleReceivedMessage(void *arg)
             }
             else
             {
+                snprintf(receiveBuffer, sizeof(receiveBuffer), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
                 wprintw(receivedMessagesWindow, "%s\n", receiveBuffer);
             }
             wrefresh(receivedMessagesWindow);
