@@ -52,7 +52,6 @@
      char *token = strtok(temporaryMessageSpace, "|");
      if (token != NULL)
      {
- 
          strncpy(clientIP, token, sizeof(clientIP) - 1);
          printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the IP: %s\n", clientIP);
      }
@@ -79,15 +78,6 @@
  
      if (token != NULL)
      {
-         // I removed the quotes being added to the message by the client
- 
-         // // Remove surrounding quotes if present.
-         // size_t len = strlen(token);
-         // if (len >= 2 && token[0] == '\"' && token[len - 1] == '\"')
-         // {
-         //     token[len - 1] = '\0';
-         //     token++;
-         // }
          strncpy(messageText, token, sizeof(messageText) - 1);
          printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MESSAGE: %s\n", messageText);
          printf("Literal Message Size: %li\n", strlen(messageText));
@@ -256,13 +246,6 @@
          {
              incomingMessage[numberOfBytesRead] = '\0';
  
-             // // Remove trailing whitespace
-             // int end = numberOfBytesRead;
-             // while (end > 0 && isspace((unsigned char)incomingMessage[end - 1]))
-             // {
-             //     incomingMessage[end - 1] = '\0';
-             //     end--;
-             // }
  
              printf("\n------- GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() Start\n");
              // Debug print the raw protocol message.
@@ -282,17 +265,6 @@
              char *msgCountField = strtok(NULL, "|");
              // Get the message
              char *messageField = strtok(NULL, "|");
- 
-             // // Remove surrounding quotes from the messageField if present.
-             // if (messageField != NULL)
-             // {
-             //     size_t len = strlen(messageField);
-             //     if (len >= 2 && messageField[0] == '\"' && messageField[len - 1] == '\"')
-             //     {
-             //         messageField[len - 1] = '\0';
-             //         messageField++;
-             //     }
-             // }
  
              // If the extracted message text is ">>bye<<", disconnect.
              if (messageField && strcmp(messageField, ">>bye<<") == 0)
