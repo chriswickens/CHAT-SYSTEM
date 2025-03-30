@@ -85,7 +85,7 @@
  
      // Format the final broadcast message.
      char broadcastMessage[512];
-     snprintf(broadcastMessage, sizeof(broadcastMessage), "%-*s [%-*s] >> %-*s", 14s, clientIP, 5, username, 41, messageText);
+     snprintf(broadcastMessage, sizeof(broadcastMessage), "%-*s [%-*s] >> %-*s", 14, clientIP, 5, username, 41, messageText);
  
      // Broadcast the message to all connected clients
      broadcastChatMessage(broadcastMessage, senderSocket);
