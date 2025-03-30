@@ -2,6 +2,7 @@
 
 #include "../inc/chat-client.h"
 
+
 // some of these belong in the common.h file
 // #define SERVER_PORT 8888      // Port number of chat server
 // #define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
