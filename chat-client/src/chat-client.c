@@ -14,7 +14,7 @@ The functions in this file are used to contain the chat-client specific function
 
 logic. It also contains the main function/test harness of said functions.
 
-*/*/
+*/
 
 #include "../inc/chat-client.h"
 
