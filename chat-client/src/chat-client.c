@@ -9,6 +9,7 @@
 // #define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
 // #define MAX_PART_LEN 40       // Maximum characters per message part
 
+
 int socketFileDescriptor;                                                                     // Global socket descriptor
 WINDOW *receivedMessagesWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle; // ncurses windows for chat display and input
 char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];                                                  // Buffer for incoming messages
