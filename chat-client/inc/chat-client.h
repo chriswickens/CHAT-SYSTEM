@@ -13,7 +13,7 @@ int startReceivingThread(int *socketFileDescriptor);
 void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor);
 void cleanup(int *socketFileDescriptor);
 // void getLocalIP(char *ipBuffer, size_t bufferSize);
-void getLocalIPFromSocket(int sock, char *ipBuffer, size_t bufferSize);
+void getClientIp(int socket, char *ipBuffer, size_t bufferSize);
 void splitMessage(const char *fullString, char *firstPart, char *secondPart);
 void checkHostName(int hostname);
 void checkHostEntryDetails(struct hostent *hostentry);

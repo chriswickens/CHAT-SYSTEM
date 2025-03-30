@@ -19,7 +19,6 @@
 
 // Your code here
 #define SERVER_PORT 8888
-
 #define MAX_PROTOL_MESSAGE_SIZE 128
 
 #endif

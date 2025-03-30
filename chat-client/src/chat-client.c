@@ -1,33 +1,34 @@
 #include "../inc/chat-client.h"
 
-/* 
+/*
 CHANGED THIS: Removed global clientIP. Instead, we will use ClientStruct in main.
 */
-typedef struct {
+typedef struct
+{
     int socketFD;
     char clientIP[256];
 } ClientStruct;
 
-// Ncurses Windows                                                                    
-WINDOW *receivedMessagesWindow, 
-*boxMsgWindow, 
-*userInputWindow, 
-*receivedTitle, 
-*inputTitle;
+// Ncurses Windows
+WINDOW *receivedMessagesWindow,
+    *boxMsgWindow,
+    *userInputWindow,
+    *receivedTitle,
+    *inputTitle;
 
 // Buffer for received messages
 char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];
 
 /*
-* FUNCTION : getLocalIP
-*
-* DESCRIPTION : This function gets the clients local IP address for
-*
-* PARAMETERS : char *ipBuffer : Buffer to store the IP address.
-*              size_t bufferSize : Size of the ipBuffer.
-*
-* RETURNS : void
-*/
+ * FUNCTION : getLocalIP
+ *
+ * DESCRIPTION : This function gets the clients local IP address for
+ *
+ * PARAMETERS : char *ipBuffer : Buffer to store the IP address.
+ *              size_t bufferSize : Size of the ipBuffer.
+ *
+ * RETURNS : void
+ */
 // void getLocalIP(char *ipBuffer, size_t bufferSize)
 // {
 //     struct ifaddrs *interfaceAddress, *ifa;
@@ -66,15 +67,15 @@ char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];
 //     strncpy(ipBuffer, "0.0.0.0", bufferSize);
 // }
 
-/* 
+/*
 CHANGED THIS:
 Instead of using getifaddrs(), this function uses getsockname() to obtain the local IP address from the socket.
 */
-void getLocalIPFromSocket(int sock, char *ipBuffer, size_t bufferSize)
+void getClientIp(int socket, char *ipBuffer, size_t bufferSize)
 {
     struct sockaddr_in localAddr;
     socklen_t addrLen = sizeof(localAddr);
-    if (getsockname(sock, (struct sockaddr *)&localAddr, &addrLen) == 0)
+    if (getsockname(socket, (struct sockaddr *)&localAddr, &addrLen) == 0)
     {
         inet_ntop(AF_INET, &localAddr.sin_addr, ipBuffer, bufferSize);
     }
@@ -84,19 +85,18 @@ void getLocalIPFromSocket(int sock, char *ipBuffer, size_t bufferSize)
     }
 }
 
-
 /*
-* FUNCTION : splitMessage
-*
-* DESCRIPTION : This function splits a message into two parts if the message is longer than 40 characters
-* It will try to do in a graceful way if possible
-*
-* PARAMETERS : const char *fullString : The full message to split.
-*              char *firstPart : Buffer to store the first part of the message.
-*              char *secondPart : Buffer to store the second part of the message.
-*
-* RETURNS : void
-*/
+ * FUNCTION : splitMessage
+ *
+ * DESCRIPTION : This function splits a message into two parts if the message is longer than 40 characters
+ * It will try to do in a graceful way if possible
+ *
+ * PARAMETERS : const char *fullString : The full message to split.
+ *              char *firstPart : Buffer to store the first part of the message.
+ *              char *secondPart : Buffer to store the second part of the message.
+ *
+ * RETURNS : void
+ */
 void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 {
     int fullStringLength = strlen(fullString);
@@ -204,14 +204,14 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 }
 
 /*
-* FUNCTION : initializeNcursesWindows
-*
-* DESCRIPTION : This function sets up the ncurses windows to display incoming and outgoing messages nicely
-*
-* PARAMETERS : None
-*
-* RETURNS : void
-*/
+ * FUNCTION : initializeNcursesWindows
+ *
+ * DESCRIPTION : This function sets up the ncurses windows to display incoming and outgoing messages nicely
+ *
+ * PARAMETERS : None
+ *
+ * RETURNS : void
+ */
 void initializeNcursesWindows(void)
 {
     initscr();
@@ -226,10 +226,10 @@ void initializeNcursesWindows(void)
     start_color();
 
     // Test pair of colours
-    init_pair(1, COLOR_BLACK, COLOR_WHITE); // Title bar for messages received
+    init_pair(1, COLOR_BLACK, COLOR_WHITE);  // Title bar for messages received
     init_pair(2, COLOR_BLACK, COLOR_YELLOW); // Received message area
     init_pair(3, COLOR_YELLOW, COLOR_BLACK); // Title bar for the user input
-    init_pair(4, COLOR_BLACK, COLOR_WHITE); // Actual user input areavvv
+    init_pair(4, COLOR_BLACK, COLOR_WHITE);  // Actual user input areavvv
 
     /*
     Received Messages and Title Area
@@ -287,15 +287,15 @@ void initializeNcursesWindows(void)
 }
 
 /*
-* FUNCTION : connectToServer
-*
-* DESCRIPTION : This function creates a socket, binds it to a port, and connects to the server
-*
-* PARAMETERS : const char *serverIpAddress : The server IP address as a string.
-*              int *socketFileDescriptor : Pointer to an integer to store the created socket file descriptor.
-*
-* RETURNS : int : 0 on success, -1 on error.
-*/
+ * FUNCTION : connectToServer
+ *
+ * DESCRIPTION : This function creates a socket, binds it to a port, and connects to the server
+ *
+ * PARAMETERS : const char *serverIpAddress : The server IP address as a string.
+ *              int *socketFileDescriptor : Pointer to an integer to store the created socket file descriptor.
+ *
+ * RETURNS : int : 0 on success, -1 on error.
+ */
 int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
 {
     // Setup a struct to hold the socket info
@@ -309,14 +309,14 @@ int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
     }
 
     // Setup a socketaddr_in struct for the client
-    struct sockaddr_in localAddr;
-    memset(&localAddr, 0, sizeof(localAddr));
-    localAddr.sin_family = AF_INET;
-    localAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    localAddr.sin_port = 0;
+    struct sockaddr_in localAddress;
+    memset(&localAddress, 0, sizeof(localAddress));
+    localAddress.sin_family = AF_INET;
+    localAddress.sin_addr.s_addr = htonl(INADDR_ANY);
+    localAddress.sin_port = 0;
 
     // Bind the client socket
-    if (bind(*socketFileDescriptor, (struct sockaddr *)&localAddr, sizeof(localAddr)) < 0)
+    if (bind(*socketFileDescriptor, (struct sockaddr *)&localAddress, sizeof(localAddress)) < 0)
     {
         perror("bind failed");
         close(*socketFileDescriptor);
@@ -328,7 +328,7 @@ int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(SERVER_PORT);
 
-    /* 
+    /*
     CHANGED THIS: Use gethostbyname to resolve the server address from a hostname.
     */
     struct hostent *hostEntry = gethostbyname(serverIpAddress);
@@ -354,15 +354,15 @@ int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
 }
 
 /*
-* FUNCTION : handleReceivedMessage
-*
-* DESCRIPTION : This function runs in a separate thread to keep checking for messages from the chat server
-* Messages are displayed using ncurses
-*
-* PARAMETERS : void *arg : Pointer to the ClientStruct structure.
-*
-* RETURNS : void * : Always returns NULL.
-*/
+ * FUNCTION : handleReceivedMessage
+ *
+ * DESCRIPTION : This function runs in a separate thread to keep checking for messages from the chat server
+ * Messages are displayed using ncurses
+ *
+ * PARAMETERS : void *arg : Pointer to the ClientStruct structure.
+ *
+ * RETURNS : void * : Always returns NULL.
+ */
 void *handleReceivedMessage(void *arg)
 {
     ClientStruct *clientDetails = (ClientStruct *)arg;
@@ -393,10 +393,21 @@ void *handleReceivedMessage(void *arg)
                 int seconds = timeInfo->tm_sec;
                 char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20]; // extra space for plus sign and null terminator
                 // If the message is from the client, change the >> to <<
-                localReceiveBuffer[24] = '<';
-                localReceiveBuffer[25] = '<';
+                // localReceiveBuffer[24] = '<';
+                // localReceiveBuffer[25] = '<';
+
+                // Replace the >> with <<
+                char *arrowPosition = strstr(localReceiveBuffer, ">>");
+                while (arrowPosition != NULL)
+                {
+                    arrowPosition[0] = '<';
+                    arrowPosition[1] = '<';
+                    arrowPosition = strstr(arrowPosition + 2, ">>");
+                }
+
                 // Format the message
                 snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", localReceiveBuffer, hours, minutes, seconds);
+
                 // Print to the curses window
                 wprintw(receivedMessagesWindow, "%s\n", displayMessage);
             }
@@ -443,14 +454,14 @@ void *handleReceivedMessage(void *arg)
 }
 
 /*
-* FUNCTION : startReceivingThread
-*
-* DESCRIPTION : This function starts a thread that runs handleReceivedMessage to get messages from the server
-*
-* PARAMETERS : int *socketFileDescriptor : Pointer to the socket file descriptor.
-*
-* RETURNS : int : 0 on success, -1 on error.
-*/
+ * FUNCTION : startReceivingThread
+ *
+ * DESCRIPTION : This function starts a thread that runs handleReceivedMessage to get messages from the server
+ *
+ * PARAMETERS : int *socketFileDescriptor : Pointer to the socket file descriptor.
+ *
+ * RETURNS : int : 0 on success, -1 on error.
+ */
 int startReceivingThread(int *socketFileDescriptor)
 {
     // CHANGED THIS: Updated parameter to allocate a ClientStruct structure.
@@ -475,15 +486,15 @@ int startReceivingThread(int *socketFileDescriptor)
 }
 
 /*
-* FUNCTION : sendProtocolMessage
-*
-* DESCRIPTION : This function sends a formatted message to the server
-*
-* PARAMETERS : const char *message : The message to send.
-*              int socketFileDescriptor : The socket file descriptor to use for sending.
-*
-* RETURNS : void
-*/
+ * FUNCTION : sendProtocolMessage
+ *
+ * DESCRIPTION : This function sends a formatted message to the server
+ *
+ * PARAMETERS : const char *message : The message to send.
+ *              int socketFileDescriptor : The socket file descriptor to use for sending.
+ *
+ * RETURNS : void
+ */
 void sendProtocolMessage(const char *message, int socketFileDescriptor)
 {
     // Get the length of the message
@@ -498,16 +509,16 @@ void sendProtocolMessage(const char *message, int socketFileDescriptor)
 }
 
 /*
-* FUNCTION : handleUserInput
-*
-* DESCRIPTION : This function handles user input from the ncurses window, and sends messages it to the server
-*
-* PARAMETERS : char *clientName : The name of the client.
-*              char *clientIP : The IP address of the client.
-*              int *socketFileDescriptor : Pointer to the socket file descriptor.
-*
-* RETURNS : void
-*/
+ * FUNCTION : handleUserInput
+ *
+ * DESCRIPTION : This function handles user input from the ncurses window, and sends messages it to the server
+ *
+ * PARAMETERS : char *clientName : The name of the client.
+ *              char *clientIP : The IP address of the client.
+ *              int *socketFileDescriptor : Pointer to the socket file descriptor.
+ *
+ * RETURNS : void
+ */
 void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor)
 {
     // clientIP is now available to send to the server or to be used to verify the broadcast.
@@ -583,14 +594,14 @@ void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor
 }
 
 /*
-* FUNCTION : cleanup
-*
-* DESCRIPTION : Closes all the ncurses windows and closes the socket
-*
-* PARAMETERS : int *socketFileDescriptor : Pointer to the socket file descriptor to close.
-*
-* RETURNS : void
-*/
+ * FUNCTION : cleanup
+ *
+ * DESCRIPTION : Closes all the ncurses windows and closes the socket
+ *
+ * PARAMETERS : int *socketFileDescriptor : Pointer to the socket file descriptor to close.
+ *
+ * RETURNS : void
+ */
 void cleanup(int *socketFileDescriptor)
 {
     // Close the socket, delete the windows
@@ -603,16 +614,16 @@ void cleanup(int *socketFileDescriptor)
 }
 
 /*
-* FUNCTION : getUserName
-*
-* DESCRIPTION : This function parses the user name from the command line arguments
-*
-* PARAMETERS : char *userArg : The argument string containing the user name (prefixed with "-user").
-*              char *userName : Buffer to store the extracted user name.
-*
-* RETURNS : int : 1 on success, -1 on error.
-*/
-int getUserName(char *userArg, char* userName)
+ * FUNCTION : getUserName
+ *
+ * DESCRIPTION : This function parses the user name from the command line arguments
+ *
+ * PARAMETERS : char *userArg : The argument string containing the user name (prefixed with "-user").
+ *              char *userName : Buffer to store the extracted user name.
+ *
+ * RETURNS : int : 1 on success, -1 on error.
+ */
+int getUserName(char *userArg, char *userName)
 {
     // Check for username switch
     if (strstr(userArg, "-user") != NULL)
@@ -647,15 +658,15 @@ int getUserName(char *userArg, char* userName)
 }
 
 /*
-* FUNCTION : getServerAddress
-*
-* DESCRIPTION : This function parses the server address from the command line arguments
-*
-* PARAMETERS : char *serverArgument : The argument string containing the server address (prefixed with "-server").
-*              char *serverAddress : Buffer to store the extracted server address.
-*
-* RETURNS : int : 1 on success, or a negative error code on error.
-*/
+ * FUNCTION : getServerAddress
+ *
+ * DESCRIPTION : This function parses the server address from the command line arguments
+ *
+ * PARAMETERS : char *serverArgument : The argument string containing the server address (prefixed with "-server").
+ *              char *serverAddress : Buffer to store the extracted server address.
+ *
+ * RETURNS : int : 1 on success, or a negative error code on error.
+ */
 int getServerAddress(char *serverArgument, char *serverAddress)
 {
     if (strstr(serverArgument, "-server") != NULL)
@@ -707,19 +718,19 @@ int getServerAddress(char *serverArgument, char *serverAddress)
 }
 
 /*
-* FUNCTION : main
-*
-* DESCRIPTION : The main function processes command-line arguments, connects to the server, initializes ncurses windows,
-*               starts the receiving thread, and handles user input.
-*
-* PARAMETERS : int argc : The number of command-line arguments.
-*              char *argv[] : The array of command-line argument strings.
-*
-* RETURNS : int : Exit status (0 for success, non-zero for error).
-*/
+ * FUNCTION : main
+ *
+ * DESCRIPTION : The main function processes command-line arguments, connects to the server, initializes ncurses windows,
+ *               starts the receiving thread, and handles user input.
+ *
+ * PARAMETERS : int argc : The number of command-line arguments.
+ *              char *argv[] : The array of command-line argument strings.
+ *
+ * RETURNS : int : Exit status (0 for success, non-zero for error).
+ */
 int main(int argc, char *argv[])
 {
-    /* 
+    /*
     CHANGED THIS: Removed global clientIP; using ClientStruct to store socket and client IP.
     */
     ClientStruct clientDetails;
@@ -760,8 +771,7 @@ int main(int argc, char *argv[])
     // CHANGED THIS: Get the client's IP address and store it in clientDetails.clientIP
     // getLocalIP(clientDetails.clientIP, sizeof(clientDetails.clientIP));
     // After connectToServer() returns successfully:
-getLocalIPFromSocket(clientDetails.socketFD, clientDetails.clientIP, sizeof(clientDetails.clientIP));
-
+    getClientIp(clientDetails.socketFD, clientDetails.clientIP, sizeof(clientDetails.clientIP));
 
     // Initialize the ncurses windows
     initializeNcursesWindows();
