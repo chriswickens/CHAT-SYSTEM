@@ -1,6 +1,4 @@
-
 #include "../inc/chat-server.h"
-
 
 // Global array for connected client sockets.
 int clientSocketList[MAX_CLIENTS];
@@ -8,17 +6,19 @@ int clientSocketList[MAX_CLIENTS];
 // Mutex to protect access to clientSocketList.
 pthread_mutex_t clientMutex = PTHREAD_MUTEX_INITIALIZER;
 
-// Function prototypes.
-int initializeListener();
-void acceptConnection(int listeningSocket);
-void broadcastChatMessage(char *messageToBroadcast, int senderSocket);
-void processClientMessage(int clientSocket);
-void *clientHandler(void *clientSocketPointer);
-
-
+/*
+* FUNCTION : parseAndBroadcastProtocolMessage
+*
+* DESCRIPTION : This function parses the message from a client, gets the client IP, username, message count, and message text,
+* formats a a return message, and then calls broadcastChatMessage to send the message to all clients
+*
+* PARAMETERS : const char *protocolMessage : The raw protocol message string.
+*              int senderSocket : The socket of the sender client.
+*
+* RETURNS : void
+*/
 void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSocket)
 {
-    printf("\n-------Parsing INCOMING message-------\n");
     char clientIP[64] = "";     // Storage for IP
     char username[64] = "";     // Storage for username
     int messageCount = -1;      // To check the message count from client
@@ -28,13 +28,13 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     strncpy(temporaryMessageSpace, protocolMessage, sizeof(temporaryMessageSpace) - 1);
     temporaryMessageSpace[sizeof(temporaryMessageSpace) - 1] = '\0';
 
-    // Tokenize using "|" as the delimiter.
     // Pull out the IP address
     char *token = strtok(temporaryMessageSpace, "|");
     if (token != NULL)
     {
         strncpy(clientIP, token, sizeof(clientIP) - 1);
-        printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the IP: %s\n", clientIP);
+        // printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the IP: %s\n", clientIP);
+
     }
 
     // Pull the username
@@ -42,7 +42,7 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     if (token != NULL)
     {
         strncpy(username, token, sizeof(username) - 1);
-        printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the USERNAME: %s\n", username);
+        // printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the USERNAME: %s\n", username);
     }
 
     // Pull the message COUNT (to check if it is one message up to 40 chars, or parts of an 80 char message)
@@ -51,7 +51,7 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     {
 
         messageCount = atoi(token);
-        printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MSG COUNT: %i\n", messageCount);
+        // printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MSG COUNT: %i\n", messageCount);
     }
 
     // Pull the message
@@ -60,8 +60,8 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     if (token != NULL)
     {
         strncpy(messageText, token, sizeof(messageText) - 1);
-        printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MESSAGE: %s\n", messageText);
-        printf("Literal Message Size: %li\n", strlen(messageText));
+        // printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MESSAGE: %s\n", messageText);
+        // printf("Literal Message Size: %li\n", strlen(messageText));
     }
 
     // Format the final broadcast message.
@@ -70,10 +70,20 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
 
     // Broadcast the message to all connected clients
     broadcastChatMessage(broadcastMessage, senderSocket);
-    printf("\nDEBUG PARSE COMPLETE: Broadcasting: %s\n", broadcastMessage);
-    printf("-------Parsing INCOMING message-------\n\n");
+    // printf("\nDEBUG PARSE COMPLETE: Broadcasting: %s\n", broadcastMessage);
+    // printf("-------Parsing INCOMING message-------\n\n");
 }
 
+/*
+* FUNCTION : initializeListener
+*
+* DESCRIPTION : This function creates a listening socket, retrieves the local host details,
+* sets socket options, binds the socket to the server port, and begins listening for incoming connections.
+*
+* PARAMETERS : None
+*
+* RETURNS : int : The listening socket descriptor on success, or exits on failure.
+*/
 int initializeListener()
 {
     int listenSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -95,7 +105,7 @@ int initializeListener()
         perror("gethostname failed");
         exit(EXIT_FAILURE);
     }
-    printf("Local host name (from gethostname): %s\n", host);
+    // printf("Local host name (from gethostname): %s\n", host);
 
     // Retrieve host details using the literal host name
     hostDetails = gethostbyname(host);
@@ -106,24 +116,27 @@ int initializeListener()
     }
 
     // Print the canonical host name
-    printf("LITERAL host name: %s\n", hostDetails->h_name);
+    // printf("LITERAL host name: %s\n", hostDetails->h_name);
 
     clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0]));
-    printf("Primary IP: %s\n", clientIP);
+    // printf("Primary IP: %s\n", clientIP);
 
     int socketOption = 1;
+    // Set socket options (REUSEADDR so it wont get stuck)
     if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &socketOption, sizeof(socketOption)) < 0)
     {
         perror("setsockopt failed");
         exit(EXIT_FAILURE);
     }
 
+    // Create the socket address details to bind to
     struct sockaddr_in serverAddress;
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(SERVER_PORT);
 
+    // Bind to the socket using socketAddress details
     if (bind(listenSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
         perror("socket binding failed");
@@ -138,7 +151,17 @@ int initializeListener()
 
     return listenSocket;
 }
-// Accepts a new connection and spawns a thread to handle it.
+
+/*
+* FUNCTION : acceptConnection
+*
+* DESCRIPTION : This function accepts an incoming connection,
+* it adds the new client to the global clientSocketList array, and creates a new thread to handle client messages.
+*
+* PARAMETERS : int listenSocket : The listening socket descriptor.
+*
+* RETURNS : void
+*/
 void acceptConnection(int listenSocket)
 {
     // Struct for client details
@@ -154,12 +177,13 @@ void acceptConnection(int listenSocket)
     }
 
     // Add the new client socket to the list
+    // Get the mutex
     pthread_mutex_lock(&clientMutex);
 
     // Check for if the client was added successfully
     int wasClientAdded = 0;
 
-    // Iterate over the client list and add the client
+    // Check the list of clients
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
         if (clientSocketList[i] == -1)
@@ -171,15 +195,18 @@ void acceptConnection(int listenSocket)
     }
     pthread_mutex_unlock(&clientMutex);
 
+    // Too many clients exist (max of 10)
     if (!wasClientAdded)
     {
-        printf("DEBUG acceptConnection: Maximum clients reached. Rejecting connection.\n");
+        // printf("DEBUG acceptConnection: Maximum clients reached. Rejecting connection.\n");
         close(clientSocket);
         return;
     }
 
     // Create a new thread for the client.
     pthread_t threadId;
+
+    // Allocate memory for the socket pointer
     int *clientSocketPointer = malloc(sizeof(int));
     if (clientSocketPointer == NULL)
     {
@@ -188,15 +215,19 @@ void acceptConnection(int listenSocket)
         return;
     }
 
-    //
+    // Create a pointer for the socket
     *clientSocketPointer = clientSocket;
 
+    // Create the thread, call clientHandler, pass in the socket
     if (pthread_create(&threadId, NULL, clientHandler, clientSocketPointer) != 0)
     {
         perror("pthread_create failed");
         free(clientSocketPointer);
         close(clientSocket);
+        // get the mutex
         pthread_mutex_lock(&clientMutex);
+
+        // Check the list of clients
         for (int i = 0; i < MAX_CLIENTS; i++)
         {
             if (clientSocketList[i] == clientSocket)
@@ -210,17 +241,32 @@ void acceptConnection(int listenSocket)
     }
     pthread_detach(threadId);
 
-    printf("DEBUG acceptConnection: New connection, socket #%d\n", clientSocket);
+    // printf("DEBUG acceptConnection: New connection, socket #%d\n", clientSocket);
 }
 
-// Broadcasts the given message to all connected clients (including the sender).
+/*
+* FUNCTION : broadcastChatMessage
+*
+* DESCRIPTION : This function broadcasts a message to all connected clients by iterating through the global 
+* clientSocketList array and sending the message
+*
+* PARAMETERS : char *messageToBroadcast : The message to broadcast.
+*              int senderSocket : The socket descriptor of the sender.
+*
+* RETURNS : void
+*/
 void broadcastChatMessage(char *messageToBroadcast, int senderSocket)
 {
+    // Get the mutex
     pthread_mutex_lock(&clientMutex);
+
+    // Check the client list
     for (int i = 0; i < MAX_CLIENTS; i++)
     {
+        // If there is a client there
         if (clientSocketList[i] != -1)
         {
+            // Send the message to the client
             int sendResult = send(clientSocketList[i], messageToBroadcast, strlen(messageToBroadcast), 0);
             if (sendResult < 0)
             {
@@ -231,10 +277,21 @@ void broadcastChatMessage(char *messageToBroadcast, int senderSocket)
     pthread_mutex_unlock(&clientMutex);
 }
 
+/*
+* FUNCTION : processClientMessage
+*
+* DESCRIPTION : This function keeps reading messages from a client, processes them, 
+* and triggers a broadcast or disconnect if necessary
+*
+* PARAMETERS : int clientSocket : The client socket descriptor.
+*
+* RETURNS : void
+*/
 void processClientMessage(int clientSocket)
 {
     char incomingMessage[MAX_PROTOL_MESSAGE_SIZE];
 
+    // Keep checking for messages from clients
     while (1)
     {
         int numberOfBytesRead = read(clientSocket, incomingMessage, MAX_PROTOL_MESSAGE_SIZE - 1);
@@ -242,9 +299,9 @@ void processClientMessage(int clientSocket)
         {
             incomingMessage[numberOfBytesRead] = '\0';
 
-            printf("\n------- GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() Start\n");
+            // printf("\n------- GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() Start\n");
             // Debug print the raw protocol message.
-            printf("DEBUG: Received message from socket %d (len=%d): \"%s\"\n", clientSocket, numberOfBytesRead, incomingMessage);
+            // printf("DEBUG: Received message from socket %d (len=%d): \"%s\"\n", clientSocket, numberOfBytesRead, incomingMessage);
 
             // Extract the protocol fields to get the actual message text.
             char temporaryMessageSpace[256];
@@ -264,7 +321,7 @@ void processClientMessage(int clientSocket)
             // If the extracted message text is ">>bye<<", disconnect.
             if (messageField && strcmp(messageField, ">>bye<<") == 0)
             {
-                printf("DEBUG processClientMessage: Client on socket #%d requested disconnect.\n", clientSocket);
+                // printf("DEBUG processClientMessage: Client on socket #%d requested disconnect.\n", clientSocket);
                 break;
             }
             else
@@ -275,7 +332,7 @@ void processClientMessage(int clientSocket)
         }
         else if (numberOfBytesRead == 0)
         {
-            printf("Client on socket #%d disconnected.\n", clientSocket);
+            // printf("Client on socket #%d disconnected.\n", clientSocket);
             break;
         }
         else
@@ -284,10 +341,18 @@ void processClientMessage(int clientSocket)
             break;
         }
     }
-    printf("\n------- END GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() FINISH\n");
+    // printf("\n------- END GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() FINISH\n");
 }
 
-// Thread function for handling a client's messages
+/*
+* FUNCTION : clientHandler
+*
+* DESCRIPTION : This function takes a client socket and starts the message processing for it
+*
+* PARAMETERS : void *clientSocketPointer : Pointer to the client socket descriptor (cast from int *).
+*
+* RETURNS : void * : Always returns NULL.
+*/
 void *clientHandler(void *clientSocketPointer)
 {
     // Cast the pointer to an int
@@ -323,7 +388,7 @@ int main()
         clientSocketList[i] = -1;
     }
 
-    printf("Server listening on port %d\n", SERVER_PORT);
+    // printf("Server listening on port %d\n", SERVER_PORT);
 
     // Start accepting connections
     while (1)
