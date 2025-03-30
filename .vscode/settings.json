@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "stdlib.h": "c",
-        "chat-client.h": "c"
+        "chat-client.h": "c",
+        "ncurses.h": "c"
     }
 }
