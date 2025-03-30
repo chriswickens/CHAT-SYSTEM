@@ -1,3 +1,21 @@
+/*
+
+FILE : chat-client.c
+
+PROJECT : SENG2030 - Assignment #4
+
+PROGRAMMER : Volfer Carvalho Freire, Jack Prudnikowicz, Kyle Murawsky, Chris Wickens, Melissa Reyes
+
+FIRST VERSION : 2025-03-25
+
+DESCRIPTION :
+
+The functions in this file are used to contain the chat-client specific function body's and
+
+logic. It also contains the main function/test harness of said functions.
+
+*/*/
+
 #include "../inc/chat-client.h"
 
 int socketFileDescriptor;                                                                     // Global socket descriptor

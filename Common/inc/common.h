@@ -1,3 +1,13 @@
+/*
+FILE : common.h
+PROJECT : SENG2030 - Assignment #4
+PROGRAMMER : Volfer Carvalho Freire, Jack Prudnikowicz, Kyle Murawsky, Chris Wickens, Melissa Reyes
+FIRST VERSION : 2025-03-25
+DESCRIPTION :
+Contains common defines used by various programs in this system
+*
+*/
+
 #ifndef COMMON_H
 #define COMMON_H
 

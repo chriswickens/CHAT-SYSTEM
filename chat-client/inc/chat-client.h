@@ -1,3 +1,13 @@
+/*
+FILE : chat-client.h
+PROJECT : SENG2030 - Assignment #4
+PROGRAMMER : Volfer Carvalho Freire, Jack Prudnikowicz, Kyle Murawsky, Chris Wickens, Melissa Reyes
+FIRST VERSION : 2025-03-25
+DESCRIPTION :
+The functions in this file are used to house all of our chat-client specific function prototypes
+and constants.
+*/
+
 #ifndef CHAT_CLIENT_H
 #define CHAT_CLIENT_H
 
