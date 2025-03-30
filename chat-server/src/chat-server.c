@@ -28,7 +28,7 @@ pthread_mutex_t clientMutex = PTHREAD_MUTEX_INITIALIZER;
 */
 void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSocket)
 {
-    printf("\n-------Parsing INCOMING message-------\n");
+    // printf("\n-------Parsing INCOMING message-------\n");
     char clientIP[64] = ""; // Storage for IP
     char username[64] = ""; // Storage for username
     int messageCount = -1; // To check the message count from client
@@ -44,7 +44,7 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     if (token != NULL)
     {
         strncpy(clientIP, token, sizeof(clientIP) - 1);
-        printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the IP: %s\n", clientIP);
+        // printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the IP: %s\n", clientIP);
     }
 
     // Pull the username
@@ -52,7 +52,7 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     if (token != NULL)
     {
         strncpy(username, token, sizeof(username) - 1);
-        printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the USERNAME: %s\n", username);
+        // printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the USERNAME: %s\n", username);
     }
 
     // Pull the message COUNT (to check if it is one message up to 40 chars, or parts of an 80 char message)
@@ -60,7 +60,7 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     if (token != NULL)
     {
         messageCount = atoi(token);
-        printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MSG COUNT: %i\n", messageCount);
+        // printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MSG COUNT: %i\n", messageCount);
     }
 
     // Pull the message
@@ -69,8 +69,8 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
     if (token != NULL)
     {
         strncpy(messageText, token, sizeof(messageText) - 1);
-        printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MESSAGE: %s\n", messageText);
-        printf("Literal Message Size: %li\n", strlen(messageText));
+        // printf("DEBUG : parseAndBroadcastProtocolMessage() - Got the MESSAGE: %s\n", messageText);
+        // printf("Literal Message Size: %li\n", strlen(messageText));
     }
 
     // Format the final broadcast message.
@@ -79,8 +79,8 @@ void parseAndBroadcastProtocolMessage(const char *protocolMessage, int senderSoc
 
     // Broadcast the message to all connected clients
     broadcastChatMessage(broadcastMessage, senderSocket);
-    printf("\nDEBUG PARSE COMPLETE: Broadcasting: %s\n", broadcastMessage);
-    printf("-------Parsing INCOMING message-------\n\n");
+    // printf("\nDEBUG PARSE COMPLETE: Broadcasting: %s\n", broadcastMessage);
+    // printf("-------Parsing INCOMING message-------\n\n");
 }
 
 /*
@@ -110,7 +110,7 @@ int initializeListener() {
         perror("gethostname failed");
         exit(EXIT_FAILURE);
     }
-    printf("Local host name (from gethostname): %s\n", host);
+    // printf("Local host name (from gethostname): %s\n", host);
 
     // Retrieve host details using the literal host name
     hostDetails = gethostbyname(host);
@@ -120,10 +120,10 @@ int initializeListener() {
     }
 
     // Print the canonical host name
-    printf("LITERAL host name: %s\n", hostDetails->h_name);
+    // printf("LITERAL host name: %s\n", hostDetails->h_name);
 
     clientIP = inet_ntoa(*((struct in_addr *)hostDetails->h_addr_list[0]));
-    printf("Primary IP: %s\n", clientIP);
+    // printf("Primary IP: %s\n", clientIP);
 
     int socketOption = 1;
     if (setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &socketOption, sizeof(socketOption)) < 0) {
@@ -186,7 +186,7 @@ void acceptConnection(int listenSocket)
 
     if (!wasClientAdded)
     {
-        printf("DEBUG acceptConnection: Maximum clients reached. Rejecting connection.\n");
+        // printf("DEBUG acceptConnection: Maximum clients reached. Rejecting connection.\n");
         close(clientSocket);
         return;
     }
@@ -221,7 +221,7 @@ void acceptConnection(int listenSocket)
     }
     pthread_detach(threadId);
 
-    printf("DEBUG acceptConnection: New connection, socket #%d\n", clientSocket);
+    // printf("DEBUG acceptConnection: New connection, socket #%d\n", clientSocket);
 }
 
 /*
@@ -271,9 +271,9 @@ void processClientMessage(int clientSocket)
         {
             incomingMessage[numberOfBytesRead] = '\0';
 
-            printf("\n------- GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() Start\n");
+            // printf("\n------- GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() Start\n");
             // Debug print the raw protocol message.
-            printf("DEBUG: Received message from socket %d (len=%d): \"%s\"\n", clientSocket, numberOfBytesRead, incomingMessage);
+            // printf("DEBUG: Received message from socket %d (len=%d): \"%s\"\n", clientSocket, numberOfBytesRead, incomingMessage);
 
             // Extract the protocol fields to get the actual message text.
             char temporaryMessageSpace[256];
@@ -293,7 +293,7 @@ void processClientMessage(int clientSocket)
             // If the extracted message text is ">>bye<<", disconnect.
             if (messageField && strcmp(messageField, ">>bye<<") == 0)
             {
-                printf("DEBUG processClientMessage: Client on socket #%d requested disconnect.\n", clientSocket);
+                // printf("DEBUG processClientMessage: Client on socket #%d requested disconnect.\n", clientSocket);
                 break;
             }
             else
@@ -304,7 +304,7 @@ void processClientMessage(int clientSocket)
         }
         else if (numberOfBytesRead == 0)
         {
-            printf("Client on socket #%d disconnected.\n", clientSocket);
+            // printf("Client on socket #%d disconnected.\n", clientSocket);
             break;
         }
         else
@@ -313,7 +313,7 @@ void processClientMessage(int clientSocket)
             break;
         }
     }
-    printf("\n------- END GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() FINISH\n");
+    // printf("\n------- END GOT MESSAGE FROM CLIENT ------\nprocessClientMessage() FINISH\n");
 }
 
 /*
@@ -367,7 +367,7 @@ int main()
         clientSocketList[i] = -1;
     }
 
-    printf("Server listening on port %d\n", SERVER_PORT);
+    // printf("Server listening on port %d\n", SERVER_PORT);
 
     // Main loop: accept new connections.
     while (1)
