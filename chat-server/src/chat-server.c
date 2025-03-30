@@ -1,3 +1,13 @@
+/*
+FILE : chat-server.c
+PROJECT : SENG2030 - Assignment #4
+PROGRAMMER : Volfer Carvalho Freire, Jack Prudnikowicz, Kyle Murawsky, Chris Wickens, Melissa Reyes
+FIRST VERSION : 2025-03-25
+DESCRIPTION :
+Contains common functions and variables used by various programs in this system
+*
+*/
+
 #include "../inc/chat-server.h"
 
 // Global array for connected client sockets.
