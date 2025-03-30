@@ -1,7 +1,12 @@
 #include "../inc/chat-client.h"
 
-// Global Socket
-// int socketFileDescriptor;
+/* 
+CHANGED THIS: Removed global clientIP. Instead, we will use ClientStruct in main.
+*/
+typedef struct {
+    int socketFD;
+    char clientIP[256];
+} ClientStruct;
 
 // Ncurses Windows                                                                    
 WINDOW *receivedMessagesWindow, 
@@ -13,9 +18,6 @@ WINDOW *receivedMessagesWindow,
 // Buffer for received messages
 char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];
 
-// Store client address
-char clientIP[256];
-
 /*
 * FUNCTION : getLocalIP
 *
@@ -26,43 +28,62 @@ char clientIP[256];
 *
 * RETURNS : void
 */
-void getLocalIP(char *ipBuffer, size_t bufferSize)
+// void getLocalIP(char *ipBuffer, size_t bufferSize)
+// {
+//     struct ifaddrs *interfaceAddress, *ifa;
+//     if (getifaddrs(&interfaceAddress) == -1)
+//     {
+//         strncpy(ipBuffer, "0.0.0.0", bufferSize);
+//         return;
+//     }
+
+//     // Iterate through available network interfaces
+//     for (ifa = interfaceAddress; ifa != NULL; ifa = ifa->ifa_next)
+//     {
+//         if (ifa->ifa_addr == NULL)
+//         {
+//             continue;
+//         }
+
+//         // Only check for IPv4 addresses
+//         if (ifa->ifa_addr->sa_family == AF_INET)
+//         {
+//             // Skip the loopback interface
+//             if (strcmp(ifa->ifa_name, "lo") == 0)
+//             {
+//                 continue;
+//             }
+
+//             struct sockaddr_in *socketAddress = (struct sockaddr_in *)ifa->ifa_addr;
+//             inet_ntop(AF_INET, &socketAddress->sin_addr, ipBuffer, bufferSize);
+//             freeifaddrs(interfaceAddress);
+//             return;
+//         }
+//     }
+
+//     // Free the memory
+//     freeifaddrs(interfaceAddress);
+//     strncpy(ipBuffer, "0.0.0.0", bufferSize);
+// }
+
+/* 
+CHANGED THIS:
+Instead of using getifaddrs(), this function uses getsockname() to obtain the local IP address from the socket.
+*/
+void getLocalIPFromSocket(int sock, char *ipBuffer, size_t bufferSize)
 {
-    struct ifaddrs *interfaceAddress, *ifa;
-    if (getifaddrs(&interfaceAddress) == -1)
+    struct sockaddr_in localAddr;
+    socklen_t addrLen = sizeof(localAddr);
+    if (getsockname(sock, (struct sockaddr *)&localAddr, &addrLen) == 0)
+    {
+        inet_ntop(AF_INET, &localAddr.sin_addr, ipBuffer, bufferSize);
+    }
+    else
     {
         strncpy(ipBuffer, "0.0.0.0", bufferSize);
-        return;
     }
-
-    // Iterate through available network interfaces
-    for (ifa = interfaceAddress; ifa != NULL; ifa = ifa->ifa_next)
-    {
-        if (ifa->ifa_addr == NULL)
-        {
-            continue;
-        }
-
-        // Only check for IPv4 addresses
-        if (ifa->ifa_addr->sa_family == AF_INET)
-        {
-            // Skip the loopback interface
-            if (strcmp(ifa->ifa_name, "lo") == 0)
-            {
-                continue;
-            }
-
-            struct sockaddr_in *socketAddress = (struct sockaddr_in *)ifa->ifa_addr;
-            inet_ntop(AF_INET, &socketAddress->sin_addr, ipBuffer, bufferSize);
-            freeifaddrs(interfaceAddress);
-            return;
-        }
-    }
-
-    // Free the memory
-    freeifaddrs(interfaceAddress);
-    strncpy(ipBuffer, "0.0.0.0", bufferSize);
 }
+
 
 /*
 * FUNCTION : splitMessage
@@ -132,10 +153,8 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
         if (
             // Is the upper hald of the message is GREATER or EQUAL to the MINIMUM split index
             upperHalfMessage >= minSplit &&
-
             // AND the upper half is LESS than or EQUAL to the MAXIMUM split index
             upperHalfMessage <= maxSplit &&
-
             // AND the character is a SPACE!
             fullString[upperHalfMessage] == ' ')
         {
@@ -156,10 +175,8 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
     {
         // Copy the first part of the split using the split index
         strncpy(firstPart, fullString, splitIndex);
-
         // Set the last character of the first part to be a null term (proper string yo!)
         firstPart[splitIndex] = '\0';
-
         // Get the second half of the string using the FULL length and subtracting the location of the split +1 to offset
         // the split
         int secondHalfLength = fullStringLength - (splitIndex + 1);
@@ -167,26 +184,20 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
         {
             secondHalfLength = CLIENT_MSG_PART_LENGTH;
         }
-
         // Copy the second part and add a null terminator
         strncpy(secondPart, fullString + splitIndex + 1, secondHalfLength);
         secondPart[secondHalfLength] = '\0';
     }
-
     // Otherwise, just cut the whole thing in half, most likely it was a big word in the middle of a large message
     else
     {
         strncpy(firstPart, fullString, splitIndex);
-
         firstPart[splitIndex] = '\0';
-
         int secondLen = fullStringLength - splitIndex;
-
         if (secondLen > CLIENT_MSG_PART_LENGTH)
         {
             secondLen = CLIENT_MSG_PART_LENGTH;
         }
-
         strncpy(secondPart, fullString + splitIndex, secondLen);
         secondPart[secondLen] = '\0';
     }
@@ -216,11 +227,8 @@ void initializeNcursesWindows(void)
 
     // Test pair of colours
     init_pair(1, COLOR_BLACK, COLOR_WHITE); // Title bar for messages received
-
     init_pair(2, COLOR_BLACK, COLOR_YELLOW); // Received message area
-
     init_pair(3, COLOR_YELLOW, COLOR_BLACK); // Title bar for the user input
-
     init_pair(4, COLOR_BLACK, COLOR_WHITE); // Actual user input areavvv
 
     /*
@@ -229,30 +237,22 @@ void initializeNcursesWindows(void)
     // Create the title for the received messages
     receivedTitle = newwin(3, width, 0, 0);
     wbkgd(receivedTitle, COLOR_PAIR(1));
-
     // Box for the message window
     boxMsgWindow = newwin(13, width, 3, 0);
-
     // Window to display the received messages
     receivedMessagesWindow = newwin(11, width - 2, 4, 1);
     wbkgd(receivedMessagesWindow, COLOR_PAIR(2));
-
     // Dont touch the cursor in the received messages window
     leaveok(receivedMessagesWindow, TRUE);
-
     // This ensures that when the 10 message limit is reached in the received messages window
     // That the window will scroll to show the new messages (without this they will NOT display properly!)
     scrollok(receivedMessagesWindow, TRUE);
-
     // Box to put the received messages inside of
     box(boxMsgWindow, 0, 0);
-
     // Box for the received TITLE
     box(receivedTitle, 0, 0);
-
     // Print title message for received messages title
     mvwprintw(receivedTitle, 1, 1, CHAT_TITLE);
-
     // Refresh Received Messages display
     wrefresh(receivedTitle);
     wrefresh(boxMsgWindow);
@@ -264,29 +264,22 @@ void initializeNcursesWindows(void)
     // Create the title window for the user input
     inputTitle = newwin(3, width, height - 6, 0);
     wbkgd(inputTitle, COLOR_PAIR(3));
-
     // Create the user input window
     userInputWindow = newwin(3, width, height - 3, 0);
     wbkgd(userInputWindow, COLOR_PAIR(4));
-
     // Keep the cursor in the user input area
     leaveok(userInputWindow, FALSE);
-
     // Box for the input title
     box(inputTitle, 0, 0);
-
     // Box for the user input
     box(userInputWindow, 0, 0);
-
     // Refresh Input title to display text
     mvwprintw(inputTitle, 1, 1, "============= USER INPUT =============");
-
     // Draw the cursor when initializing, because ncurses works so well
     mvwprintw(userInputWindow, 1, 1, "> ");
     wrefresh(userInputWindow);
     wrefresh(inputTitle);
     nodelay(userInputWindow, TRUE);
-
     // Move cursor to row 1, column 3 of the input window
     wmove(userInputWindow, 1, 3);
     curs_set(1);               // Ensure the cursor is visible
@@ -335,16 +328,17 @@ int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(SERVER_PORT);
 
-    // Convert the IP from the command line argument to an IP address
-    int addressResult = inet_pton(AF_INET, serverIpAddress, &serverAddress.sin_addr);
-
-    // If the address result is LESS than 0 (error)
-    if (addressResult < 0)
+    /* 
+    CHANGED THIS: Use gethostbyname to resolve the server address from a hostname.
+    */
+    struct hostent *hostEntry = gethostbyname(serverIpAddress);
+    if (hostEntry == NULL)
     {
-        // Error out if the address was invalid
-        printf("INVALID ADDRESS.");
+        herror("gethostbyname failed");
         return -1;
     }
+    memcpy(&serverAddress.sin_addr, hostEntry->h_addr_list[0], hostEntry->h_length);
+    /* End CHANGED THIS */
 
     // Connect
     if (connect(*socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
@@ -354,8 +348,8 @@ int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
         return -1;
     }
 
-    // Get the client's IP address after connecting (for display purposes)
-    getLocalIP(clientIP, sizeof(clientIP));
+    // CHANGED THIS: Removed global clientIP usage.
+    // Instead, main will call getLocalIP and store it in the ClientStruct.
     return 0;
 }
 
@@ -365,50 +359,44 @@ int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
 * DESCRIPTION : This function runs in a separate thread to keep checking for messages from the chat server
 * Messages are displayed using ncurses
 *
-* PARAMETERS : void *arg : Pointer to the socket file descriptor (cast to int *).
+* PARAMETERS : void *arg : Pointer to the ClientStruct structure.
 *
 * RETURNS : void * : Always returns NULL.
 */
 void *handleReceivedMessage(void *arg)
 {
-    // (void)arg; // Not using the argument
-    int socketFileDescriptor = *((int *)arg);
-
+    ClientStruct *clientDetails = (ClientStruct *)arg;
+    int socketFileDescriptor = clientDetails->socketFD;
+    char localReceiveBuffer[MAX_PROTOL_MESSAGE_SIZE];
     // Keep checking for messages in this loop
     while (1)
     {
         // Get current time
         time_t now;
         struct tm *timeInfo;
-
         // Read from the socket
-        ssize_t numberOfBytesRead = read(socketFileDescriptor, receiveBuffer, MAX_PROTOL_MESSAGE_SIZE - 1);
-
+        ssize_t numberOfBytesRead = read(socketFileDescriptor, localReceiveBuffer, MAX_PROTOL_MESSAGE_SIZE - 1);
         // If there are more than 0 bytes, there was a message
         if (numberOfBytesRead > 0)
         {
-            receiveBuffer[numberOfBytesRead] = '\0';
-
+            localReceiveBuffer[numberOfBytesRead] = '\0';
             // Check if the received message starts with our clientIP
-            if (strncmp(receiveBuffer, clientIP, strlen(clientIP)) == 0)
+            if (strncmp(localReceiveBuffer, clientDetails->clientIP, strlen(clientDetails->clientIP)) == 0)
             {
                 // Get the time
                 time(&now);
                 // Use local time
                 timeInfo = localtime(&now);
-
                 // Get hours, minutes, and seconds
                 int hours = timeInfo->tm_hour;
                 int minutes = timeInfo->tm_min;
                 int seconds = timeInfo->tm_sec;
                 char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20]; // extra space for plus sign and null terminator
                 // If the message is from the client, change the >> to <<
-                receiveBuffer[24] = '<';
-                receiveBuffer[25] = '<';
-
+                localReceiveBuffer[24] = '<';
+                localReceiveBuffer[25] = '<';
                 // Format the message
-                snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
-
+                snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", localReceiveBuffer, hours, minutes, seconds);
                 // Print to the curses window
                 wprintw(receivedMessagesWindow, "%s\n", displayMessage);
             }
@@ -416,29 +404,23 @@ void *handleReceivedMessage(void *arg)
             {
                 time(&now);
                 timeInfo = localtime(&now);
-
                 // Get hours, minutes, and seconds
                 int hours = timeInfo->tm_hour;
                 int minutes = timeInfo->tm_min;
                 int seconds = timeInfo->tm_sec;
                 char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20];
-                snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
+                snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", localReceiveBuffer, hours, minutes, seconds);
                 wprintw(receivedMessagesWindow, "%s\n", displayMessage);
             }
-
             // Refresh curses window
             wrefresh(receivedMessagesWindow);
-
             // Move cursor to row 1, column 3 of the input window (after your input marker)
             wmove(userInputWindow, 1, 3);
-
             // Ensure the cursor is visible
             curs_set(1);
-
             // Refresh the input window to update the cursor position
             wrefresh(userInputWindow);
         }
-
         // If there were no bytes read, the server disconnected
         else if (numberOfBytesRead == 0)
         {
@@ -446,7 +428,6 @@ void *handleReceivedMessage(void *arg)
             wrefresh(receivedMessagesWindow);
             break;
         }
-
         // Check for any errors
         else if (errno != EAGAIN && errno != EWOULDBLOCK)
         {
@@ -454,11 +435,9 @@ void *handleReceivedMessage(void *arg)
             wrefresh(receivedMessagesWindow);
             break;
         }
-
         // Wait for a short time between messages
         usleep(50000);
     }
-
     // Return NULL because you have to return something
     return NULL;
 }
@@ -474,16 +453,23 @@ void *handleReceivedMessage(void *arg)
 */
 int startReceivingThread(int *socketFileDescriptor)
 {
-    // The thread
-    pthread_t receivingThread;
-
-    // Start the thread using the handleReceivedMessage() function
-    if (pthread_create(&receivingThread, NULL, handleReceivedMessage, socketFileDescriptor) != 0)
+    // CHANGED THIS: Updated parameter to allocate a ClientStruct structure.
+    ClientStruct *clientDetails = (ClientStruct *)malloc(sizeof(ClientStruct));
+    if (clientDetails == NULL)
     {
+        perror("malloc failed");
         return -1;
     }
-
-    // All done
+    clientDetails->socketFD = *socketFileDescriptor;
+    // Assume main has already filled in the client's IP in clientDetails->clientIP.
+    // If not, we can call getLocalIP here, but main already does that.
+    pthread_t receivingThread;
+    // Start the thread using the handleReceivedMessage() function
+    if (pthread_create(&receivingThread, NULL, handleReceivedMessage, clientDetails) != 0)
+    {
+        free(clientDetails);
+        return -1;
+    }
     pthread_detach(receivingThread);
     return 0;
 }
@@ -502,7 +488,6 @@ void sendProtocolMessage(const char *message, int socketFileDescriptor)
 {
     // Get the length of the message
     int len = strlen(message);
-
     // Write to the socket
     if (write(socketFileDescriptor, message, len) < 0)
     {
@@ -529,19 +514,16 @@ void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor
     char sendBuffer[CLIENT_MAX_MSG_SIZE] = {0};
     int userInputIndex = 0;
     int currentCharacterAscii;
-
     while (1)
     {
         // Get user input from the ncurses window userInputWindow
         currentCharacterAscii = wgetch(userInputWindow);
-
         // Check if there was an error getting the character
         if (currentCharacterAscii == ERR)
         {
             usleep(50000);
             continue;
         }
-
         // When the user presses enter, and there is something they typed
         if (currentCharacterAscii == '\n' && userInputIndex > 0)
         {
@@ -550,7 +532,6 @@ void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor
             char protocolMsg[MAX_PROTOL_MESSAGE_SIZE];
             char messagePartOne[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
             char messagePartTwo[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
-
             // If the message is 40 characters or less
             if (bufferLength <= CLIENT_MSG_PART_LENGTH)
             {
@@ -558,7 +539,6 @@ void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|0|%s", clientIP, clientName, sendBuffer);
                 sendProtocolMessage(protocolMsg, *socketFileDescriptor);
             }
-
             // Otherwise split the message and send both parts
             else
             {
@@ -566,29 +546,23 @@ void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor
                 splitMessage(sendBuffer, messagePartOne, messagePartTwo);
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|1|%s", clientIP, clientName, messagePartOne);
                 sendProtocolMessage(protocolMsg, *socketFileDescriptor);
-
                 // Small delay to give the first message time to arrive
                 usleep(50000);
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|2|%s", clientIP, clientName, messagePartTwo);
                 sendProtocolMessage(protocolMsg, *socketFileDescriptor);
             }
-
             // Clear the input
             memset(sendBuffer, 0, sizeof(sendBuffer));
             userInputIndex = 0; // reset index counter
-
             // Erase the user text from the window
             werase(userInputWindow);
-
             // TO ensure the box is drawn every time, I had issues getting the ncurses stuff to work how we needed
             box(userInputWindow, 0, 0);
             mvwprintw(userInputWindow, 1, 1, "%s ", CLIENT_INPUT_MARKER);
-
             // Move the cursor back to the input
             wmove(userInputWindow, 1, 3);
             wrefresh(userInputWindow);
         }
-
         // If anything other than enter was typed
         else if (currentCharacterAscii != '\n')
         {
@@ -598,7 +572,6 @@ void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor
                 // Add the character to the buffer, increment the input index tracker
                 sendBuffer[userInputIndex++] = currentCharacterAscii;
                 sendBuffer[userInputIndex] = '\0'; // Set the next character to be a null terminator
-
                 // TO ensure the box is drawn every time, I had issues getting the ncurses stuff to work how we needed
                 box(userInputWindow, 0, 0);
                 mvwprintw(userInputWindow, 1, 1, "%s %s", CLIENT_INPUT_MARKER, sendBuffer);
@@ -646,7 +619,6 @@ int getUserName(char *userArg, char* userName)
     {
         // Parse and set username var if if not blank past the switch -user
         userArg += strlen("-user"); // iterate past the -user
-
         // Check to make sure strlen is valid 5 chars
         if (strlen(userArg) > 5)
         {
@@ -654,7 +626,6 @@ int getUserName(char *userArg, char* userName)
             printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
             return -1;
         }
-
         if (strcmp(userArg, "") != 0)
         {
             strcpy(userName, userArg);
@@ -695,10 +666,8 @@ int getServerAddress(char *serverArgument, char *serverAddress)
         {
             // check for ip
             int part1, part2, part3, part4, result;
-
             // Check to see if the argument is an ip address or a server name
             result = sscanf(serverArgument, "%d.%d.%d.%d", &part1, &part2, &part3, &part4);
-
             if (result == 4)
             {
                 // We have an Ip address
@@ -737,15 +706,26 @@ int getServerAddress(char *serverArgument, char *serverAddress)
     }
 }
 
-
+/*
+* FUNCTION : main
+*
+* DESCRIPTION : The main function processes command-line arguments, connects to the server, initializes ncurses windows,
+*               starts the receiving thread, and handles user input.
+*
+* PARAMETERS : int argc : The number of command-line arguments.
+*              char *argv[] : The array of command-line argument strings.
+*
+* RETURNS : int : Exit status (0 for success, non-zero for error).
+*/
 int main(int argc, char *argv[])
 {
+    /* 
+    CHANGED THIS: Removed global clientIP; using ClientStruct to store socket and client IP.
+    */
+    ClientStruct clientDetails;
 
     char userName[6];
     char serverName[256] = "Ip address used";
-    int socketFileDescriptor;
-    // char serverIp[17] = "Server name used";
-
     // Check if arg count is valid
     if (argc != 3)
     {
@@ -756,7 +736,7 @@ int main(int argc, char *argv[])
 
     // Get the user name from the arguments
     int userNameResult = getUserName(argv[1], userName);
-    if(userNameResult < 0)
+    if (userNameResult < 0)
     {
         // Exit with error
         exit(EXIT_FAILURE);
@@ -764,20 +744,24 @@ int main(int argc, char *argv[])
 
     // Get the server address from the arguments
     int serverAddressResult = getServerAddress(argv[2], serverName);
-    if(serverAddressResult < 0)
+    if (serverAddressResult < 0)
     {
         // Exit with error
         exit(EXIT_FAILURE);
     }
 
-    // Attempt to connect to the server
-    if (connectToServer(serverName, &socketFileDescriptor) < 0)
+    // Attempt to connect to the server, store socket in clientDetails.socketFD
+    if (connectToServer(serverName, &clientDetails.socketFD) < 0)
     {
-        // wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
-        // wrefresh(receivedMessagesWindow);
-        cleanup(&socketFileDescriptor);
+        cleanup(&clientDetails.socketFD);
         exit(EXIT_FAILURE);
     }
+
+    // CHANGED THIS: Get the client's IP address and store it in clientDetails.clientIP
+    // getLocalIP(clientDetails.clientIP, sizeof(clientDetails.clientIP));
+    // After connectToServer() returns successfully:
+getLocalIPFromSocket(clientDetails.socketFD, clientDetails.clientIP, sizeof(clientDetails.clientIP));
+
 
     // Initialize the ncurses windows
     initializeNcursesWindows();
@@ -786,8 +770,8 @@ int main(int argc, char *argv[])
     // wprintw(receivedMessagesWindow, "CLIENT IP: %s\n", clientIP);
     // wprintw(receivedMessagesWindow, "Server : %s\n", serverName);
     // wrefresh(receivedMessagesWindow);
-    startReceivingThread(&socketFileDescriptor);
-    handleUserInput(userName, clientIP, &socketFileDescriptor);
-    cleanup(&socketFileDescriptor);
+    startReceivingThread(&clientDetails.socketFD);
+    handleUserInput(userName, clientDetails.clientIP, &clientDetails.socketFD);
+    cleanup(&clientDetails.socketFD);
     return 0;
 }
