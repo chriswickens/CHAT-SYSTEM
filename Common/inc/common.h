@@ -14,6 +14,8 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <time.h>
 
 // Your code here
 #define SERVER_PORT 8888

@@ -1,18 +1,4 @@
-/*
- * chat-client.c
- *
- * Updated to use ncurses for I/O and to send messages using a custom protocol:
- *   CLIENTIPADDRESS|CLIENTUSERNAME|MESSAGECOUNT|"Message text"
- *
- * If a message exceeds 40 characters, it is split into two parts:
- *   MESSAGECOUNT 1 for the first part, and MESSAGECOUNT 2 for the second.
- * The server then parses this protocol message and broadcasts
- * the formatted message (e.g., 127.0.0.1 [Chris] MESSAGE)
- * to every connected client (including the sender).
- *
- * When receiving a message, the client checks if the IP in the message
- * matches its own. If so, it appends a plus sign (+) to the end of the message.
- */
+
 
 #include "../inc/chat-client.h"
 
@@ -26,7 +12,7 @@ int socketFileDescriptor;                                                       
 WINDOW *receivedMessagesWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle; // ncurses windows for chat display and input
 char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];                                                  // Buffer for incoming messages
 
-char clientIP[INET_ADDRSTRLEN]; // Stores the client's IP address
+char clientIP[256]; // Stores the client's IP address
 
 // Function prototypes
 // These belong in the chat-client.h file
@@ -38,50 +24,52 @@ void *handleReceivedMessage(void *arg);
 int startReceivingThread(void);
 void handleUserInput(char *userName, char *clientIP);
 void cleanup(void);
-void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize);
+void getLocalIP(char *ipBuffer, size_t bufferSize);
 void splitMessage(const char *fullString, char *firstPart, char *secondPart);
-
 void checkHostName(int hostname);
 void checkHostEntryDetails(struct hostent *hostentry);
 void ipAddressFormatter(char *IPbuffer);
+void sendProtocolMessage(const char *message);
+void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int userInputIndex);
 
-// THIS WAS CHANGED: Modified getLocalIP() to use a dummy UDP socket to get the external IP.
-// THIS WAS CHANGED: Rewrote getLocalIP() to use getifaddrs() to retrieve the non-loopback IP.
-#include <ifaddrs.h>
-#include <arpa/inet.h>
-#include <time.h>
-
-void getLocalIP(int socketDescriptor, char *ipBuffer, size_t bufferSize)
+void getLocalIP(char *ipBuffer, size_t bufferSize)
 {
-    (void)socketDescriptor; // Not used in this implementation.
-    struct ifaddrs *ifaddr, *ifa;
-    if (getifaddrs(&ifaddr) == -1)
+    // (void)socketDescriptor; // Not used in this implementation.
+    struct ifaddrs *ifAddress, *ifa;
+    if (getifaddrs(&ifAddress) == -1)
     {
         strncpy(ipBuffer, "0.0.0.0", bufferSize);
         return;
     }
     // Iterate through available network interfaces
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    for (ifa = ifAddress; ifa != NULL; ifa = ifa->ifa_next)
     {
         if (ifa->ifa_addr == NULL)
+        {
             continue;
-        // Only consider IPv4 addresses
+        }
+
+        // Only check for IPv4 addresses
         if (ifa->ifa_addr->sa_family == AF_INET)
         {
             // Skip the loopback interface
             if (strcmp(ifa->ifa_name, "lo") == 0)
+            {
                 continue;
-            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;
-            inet_ntop(AF_INET, &sa->sin_addr, ipBuffer, bufferSize);
-            freeifaddrs(ifaddr);
+            }
+
+            struct sockaddr_in *socketAddress = (struct sockaddr_in *)ifa->ifa_addr;
+            inet_ntop(AF_INET, &socketAddress->sin_addr, ipBuffer, bufferSize);
+            freeifaddrs(ifAddress);
             return;
         }
     }
-    freeifaddrs(ifaddr);
+
+    // Free the memory
+    freeifaddrs(ifAddress);
     strncpy(ipBuffer, "0.0.0.0", bufferSize);
 }
 
-// Splitting function based on the provided algorithm
 void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 {
     int fullStringLength = strlen(fullString);
@@ -200,12 +188,6 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 
 void initializeNcursesWindows(void)
 {
-
-    /*
-    Declared windows:
-    *receivedMessagesWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle;
-
-    */
     initscr();
     cbreak();
     noecho();
@@ -308,12 +290,14 @@ int connectToServer(const char *serverIpAddress)
         return -1;
     }
 
-    // THIS WAS CHANGED: Bind the socket explicitly to INADDR_ANY with an ephemeral port
+    // Setup a socketaddr_in struct for the client
     struct sockaddr_in localAddr;
     memset(&localAddr, 0, sizeof(localAddr));
     localAddr.sin_family = AF_INET;
     localAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    localAddr.sin_port = 0; // Let the OS choose an ephemeral port
+    localAddr.sin_port = 0;
+
+    // Bind the client socket
     if (bind(socketFileDescriptor, (struct sockaddr *)&localAddr, sizeof(localAddr)) < 0)
     {
         perror("bind failed");
@@ -321,13 +305,15 @@ int connectToServer(const char *serverIpAddress)
         return -1;
     }
 
-    // Allocate memory to store the address information
+    // memory to store the address information
     memset(&serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(SERVER_PORT);
 
     // Convert the IP from the command line argument to an IP address
     int addressResult = inet_pton(AF_INET, serverIpAddress, &serverAddress.sin_addr);
+
+    // If the address result is LESS than 0 (error)
     if (addressResult < 0)
     {
         // Error out if the address was invalid
@@ -335,29 +321,34 @@ int connectToServer(const char *serverIpAddress)
         return -1;
     }
 
+    // Connect
     if (connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
         close(socketFileDescriptor);
         printf("ERROR CONNECTING TO SERVER!!\n\n");
         return -1;
     }
-    // Get the client's IP address after connecting
-    getLocalIP(socketFileDescriptor, clientIP, sizeof(clientIP));
+
+    // Get the client's IP address after connecting (for display purposes)
+    getLocalIP(clientIP, sizeof(clientIP));
     return 0;
 }
 
 void *handleReceivedMessage(void *arg)
 {
-    (void)arg;
+    (void)arg; // Not using the argument
+
+    // Keep checking for messages in this loop
     while (1)
     {
         // Get current time
         time_t now;
         struct tm *timeInfo;
 
-
-
+        // Read from the socket
         ssize_t numberOfBytesRead = read(socketFileDescriptor, receiveBuffer, MAX_PROTOL_MESSAGE_SIZE - 1);
+
+        // If there are more than 0 bytes, there was a message
         if (numberOfBytesRead > 0)
         {
             receiveBuffer[numberOfBytesRead] = '\0';
@@ -365,25 +356,32 @@ void *handleReceivedMessage(void *arg)
             // Check if the received message starts with our clientIP
             if (strncmp(receiveBuffer, clientIP, strlen(clientIP)) == 0)
             {
-                time(&now);                 // Get system time
-                timeInfo = localtime(&now); // Convert to local time structure
-        
-                // Extract hours, minutes, and seconds
+                // Get the time
+                time(&now);
+                // Use local time
+                timeInfo = localtime(&now);
+
+                // Get hours, minutes, and seconds
                 int hours = timeInfo->tm_hour;
                 int minutes = timeInfo->tm_min;
                 int seconds = timeInfo->tm_sec;
                 char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20]; // extra space for plus sign and null terminator
+                // If the message is from the client, change the >> to <<
                 receiveBuffer[24] = '<';
                 receiveBuffer[25] = '<';
+
+                // Format the message
                 snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
+
+                // Print to the curses window
                 wprintw(receivedMessagesWindow, "%s\n", displayMessage);
             }
             else
             {
-                time(&now);                 // Get system time
-                timeInfo = localtime(&now); // Convert to local time structure
-        
-                // Extract hours, minutes, and seconds
+                time(&now);
+                timeInfo = localtime(&now);
+
+                // Get hours, minutes, and seconds
                 int hours = timeInfo->tm_hour;
                 int minutes = timeInfo->tm_min;
                 int seconds = timeInfo->tm_sec;
@@ -391,17 +389,29 @@ void *handleReceivedMessage(void *arg)
                 snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
                 wprintw(receivedMessagesWindow, "%s\n", displayMessage);
             }
+
+            // Refresh curses window
             wrefresh(receivedMessagesWindow);
-            wmove(userInputWindow, 1, 3); // Move cursor to row 1, column 3 of the input window (after your input marker)
-            curs_set(1);                  // Ensure the cursor is visible
-            wrefresh(userInputWindow);    // Refresh the input window to update the cursor position
+
+            // Move cursor to row 1, column 3 of the input window (after your input marker)
+            wmove(userInputWindow, 1, 3);
+
+            // Ensure the cursor is visible
+            curs_set(1);
+
+            // Refresh the input window to update the cursor position
+            wrefresh(userInputWindow);
         }
+
+        // If there were no bytes read, the server disconnected
         else if (numberOfBytesRead == 0)
         {
             wprintw(receivedMessagesWindow, "Server disconnected.\n");
             wrefresh(receivedMessagesWindow);
             break;
         }
+
+        // Check for any errors
         else if (errno != EAGAIN && errno != EWOULDBLOCK)
         {
             wprintw(receivedMessagesWindow, "handleReceivedMessage() : Read error: %s\n", strerror(errno));
@@ -409,29 +419,39 @@ void *handleReceivedMessage(void *arg)
             break;
         }
 
+        // Wait for a short time between messages
         usleep(50000);
     }
 
+    // Return NULL because you have to return something
     return NULL;
 }
 
 int startReceivingThread()
 {
+    // The thread
     pthread_t receivingThread;
+
+    // Start the thread using the handleReceivedMessage() function
     if (pthread_create(&receivingThread, NULL, handleReceivedMessage, NULL) != 0)
     {
         return -1;
     }
+
+    // All done
     pthread_detach(receivingThread);
     return 0;
 }
 
-// Sends a protocol message to the server.
 void sendProtocolMessage(const char *message)
 {
+    // Get the length of the message
     int len = strlen(message);
+
+    // Write to the socket
     if (write(socketFileDescriptor, message, len) < 0)
     {
+        // Error
         wprintw(receivedMessagesWindow, "Failed to send message: %s\n", strerror(errno));
         wrefresh(receivedMessagesWindow);
     }
@@ -446,55 +466,74 @@ void handleUserInput(char *clientName, char *clientIP)
 
     while (1)
     {
+        // Get user input from the ncurses window userInputWindow
         currentCharacterAscii = wgetch(userInputWindow);
+
+        // Check if there was an error getting the character
         if (currentCharacterAscii == ERR)
         {
             usleep(50000);
             continue;
         }
-        // On Enter with non-empty input.
+
+        // When the user presses enter, and there is something they typed
         if (currentCharacterAscii == '\n' && userInputIndex > 0)
         {
             sendBuffer[userInputIndex] = '\0';
-            int len = strlen(sendBuffer);
+            int bufferLength = strlen(sendBuffer);
             char protocolMsg[MAX_PROTOL_MESSAGE_SIZE];
             char messagePartOne[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
             char messagePartTwo[CLIENT_MSG_PART_LENGTH + 1] = {"0"};
 
-            // Hardcoded username "Chris"
-            const char *username = clientName;
-            if (len <= CLIENT_MSG_PART_LENGTH)
+            // If the message is 40 characters or less
+            if (bufferLength <= CLIENT_MSG_PART_LENGTH)
             {
-                // Single message: MESSAGECOUNT 0.
+                // Send a single message
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|0|%s", clientIP, clientName, sendBuffer);
                 sendProtocolMessage(protocolMsg);
             }
 
+            // Otherwise split the message and send both parts
             else
             {
                 // Split the message into two parts.
                 splitMessage(sendBuffer, messagePartOne, messagePartTwo);
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|1|%s", clientIP, clientName, messagePartOne);
                 sendProtocolMessage(protocolMsg);
-                usleep(50000); // Small delay to help preserve order.
+
+                // Small delay to give the first message time to arrive
+                usleep(50000);
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|2|%s", clientIP, clientName, messagePartTwo);
                 sendProtocolMessage(protocolMsg);
             }
-            // Clear the input (do not print the sent message in the chat window).
+
+            // Clear the input
             memset(sendBuffer, 0, sizeof(sendBuffer));
-            userInputIndex = 0;
+            userInputIndex = 0; // reset index counter
+
+            // Erase the user text from the window
             werase(userInputWindow);
+
+            // TO ensure the box is drawn every time, I had issues getting the ncurses stuff to work how we needed
             box(userInputWindow, 0, 0);
             mvwprintw(userInputWindow, 1, 1, "%s ", CLIENT_INPUT_MARKER);
+
+            // Move the cursor back to the input
             wmove(userInputWindow, 1, 3);
             wrefresh(userInputWindow);
         }
+
+        // If anything other than enter was typed
         else if (currentCharacterAscii != '\n')
         {
+            // Check if the input is less than the max size (-1 because the macro accounts for null terms)
             if (userInputIndex < CLIENT_MAX_MSG_SIZE - 1)
             {
+                // Add the character to the buffer, increment the input index tracker
                 sendBuffer[userInputIndex++] = currentCharacterAscii;
-                sendBuffer[userInputIndex] = '\0';
+                sendBuffer[userInputIndex] = '\0'; // Set the next character to be a null terminator
+
+                // TO ensure the box is drawn every time, I had issues getting the ncurses stuff to work how we needed
                 box(userInputWindow, 0, 0);
                 mvwprintw(userInputWindow, 1, 1, "%s %s", CLIENT_INPUT_MARKER, sendBuffer);
                 wmove(userInputWindow, 1, 3 + userInputIndex);
@@ -506,110 +545,104 @@ void handleUserInput(char *clientName, char *clientIP)
 
 void cleanup()
 {
+    // Close the socket, delete the windows
     close(socketFileDescriptor);
     delwin(receivedMessagesWindow);
     delwin(userInputWindow);
+    delwin(inputTitle);
+    delwin(receivedTitle);
     endwin();
 }
 
-void checkHostName(int hostname)
-{ // This function returns host name for local computer
-    if (hostname == -1)
-    {
-        perror("gethostname");
-        exit(1);
-    }
-}
-void checkHostEntryDetails(struct hostent *hostentry)
-{ // find host info from host name
-    if (hostentry == NULL)
-    {
-        perror("gethostbyname");
-        exit(1);
-    }
-}
+// void checkHostName(int hostname)
+// { // This function returns host name for local computer
+//     if (hostname == -1)
+//     {
+//         perror("gethostname");
+//         exit(1);
+//     }
+// }
 
-void ipAddressFormatter(char *IPbuffer)
-{ // convert IP string to dotted decimal format
-    if (NULL == IPbuffer)
-    {
-        perror("inet_ntoa");
-        exit(1);
-    }
-}
+// void checkHostEntryDetails(struct hostent *hostentry)
+// { // find host info from host name
+//     if (hostentry == NULL)
+//     {
+//         perror("gethostbyname");
+//         exit(1);
+//     }
+// }
 
-void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int userInputIndex)
+// void ipAddressFormatter(char *IPbuffer)
+// { // convert IP string to dotted decimal format
+//     if (NULL == IPbuffer)
+//     {
+//         perror("inet_ntoa");
+//         exit(1);
+//     }
+// }
+
+// void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int userInputIndex)
+// {
+//     werase(inputWin);
+//     box(inputWin, 0, 0);
+//     // Print the input marker and current user input
+//     mvwprintw(inputWin, 1, 1, "%s %s", CLIENT_INPUT_MARKER, currentBuffer);
+//     // Move the cursor to the appropriate position (adjust the coordinates as needed)
+//     wmove(inputWin, 1, 3 + userInputIndex);
+//     wrefresh(inputWin);
+// }
+int getUserName(char *userArg, char* userName);
+
+int getUserName(char *userArg, char* userName)
 {
-    werase(inputWin);
-    box(inputWin, 0, 0);
-    // Print the input marker and current user input.
-    mvwprintw(inputWin, 1, 1, "%s %s", CLIENT_INPUT_MARKER, currentBuffer);
-    // Move the cursor to the appropriate position (adjust the coordinates as needed).
-    wmove(inputWin, 1, 3 + userInputIndex);
-    wrefresh(inputWin);
-}
-
-int main(int argc, char *argv[])
-{
-
-    char userName[6];
-    char serverName[256] = "Ip address used";
-    // char serverIp[17] = "Server name used";
-
-    // Check if arg count is valid
-    if (argc != 3)
-    {
-        printf("Not Enough Arguments\n");
-        printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
-        return -1;
-    }
-
     // Check for username switch
-    if (strstr(argv[1], "-user") != NULL)
+    if (strstr(userArg, "-user") != NULL)
     {
         // Parse and set username var if if not blank past the switch -user
-        argv[1] += strlen("-user"); // iterate past the -user
+        userArg += strlen("-user"); // iterate past the -user
 
         // Check to make sure strlen is valid 5 chars
-        if (strlen(argv[1]) > 5)
+        if (strlen(userArg) > 5)
         {
             printf("User name exceedes the 5 character limit!\n");
             printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
-            return -5;
+            return -1;
         }
 
-        if (strcmp(argv[1], "") != 0)
+        if (strcmp(userArg, "") != 0)
         {
-            strcpy(userName, argv[1]);
+            strcpy(userName, userArg);
+            return 1;
         }
         else
         {
             printf("No user name attached to the -user switch!\n");
             printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
-            return -2;
+            return -1;
         }
     }
     else // No -user switch
     {
         printf("No -user switch!\n");
         printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
-        return -3;
+        return -1;
     }
+}
 
-    // Server checks
-
-    // Check for server name switch
-    if (strstr(argv[2], "-server") != NULL)
+int getServerAddress(char *serverArgument, char *serverAddress);
+int getServerAddress(char *serverArgument, char *serverAddress)
+{
+    if (strstr(serverArgument, "-server") != NULL)
     {
         // Parse and set server name var if if not blank past the switch -server
-        argv[2] += strlen("-server"); // iterate past the -server
-        if (strcmp(argv[2], "") != 0)
+        serverArgument += strlen("-server"); // iterate past the -server
+        if (strcmp(serverArgument, "") != 0)
         {
             // check for ip
             int part1, part2, part3, part4, result;
 
             // Check to see if the argument is an ip address or a server name
-            result = sscanf(argv[2], "%d.%d.%d.%d", &part1, &part2, &part3, &part4);
+            result = sscanf(serverArgument, "%d.%d.%d.%d", &part1, &part2, &part3, &part4);
 
             if (result == 4)
             {
@@ -617,7 +650,7 @@ int main(int argc, char *argv[])
                 if (part1 >= 0 && part1 < 256 && part2 >= 0 && part2 < 256 && part3 >= 0 && part3 < 256 && part4 >= 0 && part4 < 256)
                 {
                     // Ip address is valid
-                    strcpy(serverName, argv[2]);
+                    strcpy(serverAddress, serverArgument);
                 }
                 else
                 {
@@ -630,7 +663,8 @@ int main(int argc, char *argv[])
             else if (result == 0)
             {
                 // Else we have a server name
-                strcpy(serverName, argv[2]);
+                strcpy(serverAddress, serverArgument);
+                return 1;
             }
         }
         else
@@ -646,30 +680,57 @@ int main(int argc, char *argv[])
         printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name or Ip address.\n");
         return -3;
     }
+}
 
-    printf("User Name: %s\n", userName);
-    printf("Server Name: %s\n", serverName);
-    printf("Socket Ip: %s\n", serverName);
+int main(int argc, char *argv[])
+{
 
-    // THIS WAS CHANGED: Removed the gethostbyname block and replaced it with a simple gethostname() call.
-    char host[256];
-    gethostname(host, sizeof(host));
+    char userName[6];
+    char serverName[256] = "Ip address used";
+    // char serverIp[17] = "Server name used";
 
-    initializeNcursesWindows();
+    // Check if arg count is valid
+    if (argc != 3)
+    {
+        printf("Not Enough Arguments\n");
+        printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name.\n");
+        exit(EXIT_FAILURE);
+    }
 
+    // Get the user name from the arguments
+    int userNameResult = getUserName(argv[1], userName);
+    if(userNameResult < 0)
+    {
+        // Exit with error
+        exit(EXIT_FAILURE);
+    }
+
+    // Get the server address from the arguments
+    int serverAddressResult = getServerAddress(argv[2], serverName);
+    if(serverAddressResult < 0)
+    {
+        // Exit with error
+        exit(EXIT_FAILURE);
+    }
+
+
+    // Attempt to connect to the server
     if (connectToServer(serverName) < 0)
     {
-        wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
-        wrefresh(receivedMessagesWindow);
+        // wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
+        // wrefresh(receivedMessagesWindow);
         cleanup();
         exit(EXIT_FAILURE);
     }
 
+
+    // Initialize the ncurses windows
+    initializeNcursesWindows();
     // THIS WAS CHANGED: Use 'host' from gethostname() instead of hostDetails->h_name.
-    wprintw(receivedMessagesWindow, "Host Name: %s\n", host);
-    wprintw(receivedMessagesWindow, "CLIENT IP: %s\n", clientIP);
-    wprintw(receivedMessagesWindow, "Server : %s\n", serverName);
-    wrefresh(receivedMessagesWindow);
+    // wprintw(receivedMessagesWindow, "Host Name: %s\n", host);
+    // wprintw(receivedMessagesWindow, "CLIENT IP: %s\n", clientIP);
+    // wprintw(receivedMessagesWindow, "Server : %s\n", serverName);
+    // wrefresh(receivedMessagesWindow);
     startReceivingThread();
     handleUserInput(userName, clientIP);
     cleanup();
