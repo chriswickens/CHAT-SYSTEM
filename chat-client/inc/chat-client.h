@@ -22,9 +22,6 @@ void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int user
 
 // Code here
 #define CLIENT_INPUT_MARKER ">"
-
-
-
 #define CLIENT_MAX_MSG_SIZE 81 // Message size used for MAX in client
 #define CLIENT_MSG_PART_LENGTH 40
 

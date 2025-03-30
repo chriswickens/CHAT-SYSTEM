@@ -1,25 +1,20 @@
 #include "../inc/chat-client.h"
 
-
-// some of these belong in the common.h file
-// #define SERVER_PORT 8888      // Port number of chat server
-// #define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
-// #define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
-// #define MAX_PART_LEN 40       // Maximum characters per message part
-
-
 int socketFileDescriptor;                                                                     // Global socket descriptor
 WINDOW *receivedMessagesWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle; // ncurses windows for chat display and input
 char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];                                                  // Buffer for incoming messages
-
 char clientIP[256]; // Stores the client's IP address
 
-// Function prototypes
-// These belong in the chat-client.h file
-
-// SOME FUNCTION PROTOTYPES ARE MISSING!
-
-
+/*
+* FUNCTION : getLocalIP
+*
+* DESCRIPTION : Get the local IP address from the network interfaces and store it in ipBuffer
+*
+* PARAMETERS : char *ipBuffer : buffer to store the IP address
+* size_t bufferSize : size of ipBuffer
+*
+* RETURNS : void
+*/
 void getLocalIP(char *ipBuffer, size_t bufferSize)
 {
     // (void)socketDescriptor; // Not used in this implementation.
@@ -58,6 +53,17 @@ void getLocalIP(char *ipBuffer, size_t bufferSize)
     strncpy(ipBuffer, "0.0.0.0", bufferSize);
 }
 
+/*
+* FUNCTION : splitMessage
+*
+* DESCRIPTION : Split a full string message into two parts, tries to split it at a good point if it can
+*
+* PARAMETERS : const char *fullString : the full message to split
+* char *firstPart : buffer for the first part of the message
+* char *secondPart : buffer for the second part of the message
+*
+* RETURNS : void
+*/
 void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 {
     int fullStringLength = strlen(fullString);
@@ -174,6 +180,15 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
     }
 }
 
+/*
+* FUNCTION : initializeNcursesWindows
+*
+* DESCRIPTION : Initialize the ncurses windows for chat display and user input
+*
+* PARAMETERS : void
+*
+* RETURNS : void
+*/
 void initializeNcursesWindows(void)
 {
     initscr();
@@ -266,6 +281,15 @@ void initializeNcursesWindows(void)
     wrefresh(userInputWindow); // Refresh the input window to update the cursor position
 }
 
+/*
+* FUNCTION : connectToServer
+*
+* DESCRIPTION : Connect to the chat server using the given IP address
+*
+* PARAMETERS : const char *serverIpAddress : the server IP address to connect to
+*
+* RETURNS : int : 0 on success or -1 on error
+*/
 int connectToServer(const char *serverIpAddress)
 {
     // Setup a struct to hold the socket info
@@ -322,6 +346,15 @@ int connectToServer(const char *serverIpAddress)
     return 0;
 }
 
+/*
+* FUNCTION : handleReceivedMessage
+*
+* DESCRIPTION : Handle incoming messages from the server and update the ncurses window
+*
+* PARAMETERS : void *arg : unused parameter
+*
+* RETURNS : void * : always returns NULL
+*/
 void *handleReceivedMessage(void *arg)
 {
     (void)arg; // Not using the argument
@@ -415,6 +448,15 @@ void *handleReceivedMessage(void *arg)
     return NULL;
 }
 
+/*
+* FUNCTION : startReceivingThread
+*
+* DESCRIPTION : Start a new thread to handle incoming messages
+*
+* PARAMETERS : void
+*
+* RETURNS : int : 0 on success or -1 on error
+*/
 int startReceivingThread()
 {
     // The thread
@@ -431,6 +473,15 @@ int startReceivingThread()
     return 0;
 }
 
+/*
+* FUNCTION : sendProtocolMessage
+*
+* DESCRIPTION : Send a message to the server using the chat protocol
+*
+* PARAMETERS : const char *message : the message to send
+*
+* RETURNS : void
+*/
 void sendProtocolMessage(const char *message)
 {
     // Get the length of the message
@@ -445,6 +496,16 @@ void sendProtocolMessage(const char *message)
     }
 }
 
+/*
+* FUNCTION : handleUserInput
+*
+* DESCRIPTION : Handle user input from the ncurses window and send messages to the server
+*
+* PARAMETERS : char *clientName : the name of the client
+* char *clientIP : the IP address of the client
+*
+* RETURNS : void
+*/
 void handleUserInput(char *clientName, char *clientIP)
 {
     // clientIP is now available to send to the server or to be used to verify the broadcast.
@@ -531,6 +592,15 @@ void handleUserInput(char *clientName, char *clientIP)
     }
 }
 
+/*
+* FUNCTION : cleanup
+*
+* DESCRIPTION : Clean up resources by closing the socket and deleting ncurses windows
+*
+* PARAMETERS : void
+*
+* RETURNS : void
+*/
 void cleanup()
 {
     // Close the socket, delete the windows
@@ -542,45 +612,16 @@ void cleanup()
     endwin();
 }
 
-// void checkHostName(int hostname)
-// { // This function returns host name for local computer
-//     if (hostname == -1)
-//     {
-//         perror("gethostname");
-//         exit(1);
-//     }
-// }
-
-// void checkHostEntryDetails(struct hostent *hostentry)
-// { // find host info from host name
-//     if (hostentry == NULL)
-//     {
-//         perror("gethostbyname");
-//         exit(1);
-//     }
-// }
-
-// void ipAddressFormatter(char *IPbuffer)
-// { // convert IP string to dotted decimal format
-//     if (NULL == IPbuffer)
-//     {
-//         perror("inet_ntoa");
-//         exit(1);
-//     }
-// }
-
-// void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int userInputIndex)
-// {
-//     werase(inputWin);
-//     box(inputWin, 0, 0);
-//     // Print the input marker and current user input
-//     mvwprintw(inputWin, 1, 1, "%s %s", CLIENT_INPUT_MARKER, currentBuffer);
-//     // Move the cursor to the appropriate position (adjust the coordinates as needed)
-//     wmove(inputWin, 1, 3 + userInputIndex);
-//     wrefresh(inputWin);
-// }
-int getUserName(char *userArg, char* userName);
-
+/*
+* FUNCTION : getUserName
+*
+* DESCRIPTION : Extract and validate the username from command line arguments
+*
+* PARAMETERS : char *userArg : command line argument containing the username
+* char *userName : buffer to store the validated username
+*
+* RETURNS : int : 1 on success or negative value on error
+*/
 int getUserName(char *userArg, char* userName)
 {
     // Check for username switch
@@ -617,7 +658,16 @@ int getUserName(char *userArg, char* userName)
     }
 }
 
-int getServerAddress(char *serverArgument, char *serverAddress);
+/*
+* FUNCTION : getServerAddress
+*
+* DESCRIPTION : Extract and validate the server address or hostname from command line arguments
+*
+* PARAMETERS : char *serverArgument : command line argument containing the server address
+* char *serverAddress : buffer to store the validated server address or hostname
+*
+* RETURNS : int : 1 on success or negative value on error
+*/
 int getServerAddress(char *serverArgument, char *serverAddress)
 {
     if (strstr(serverArgument, "-server") != NULL)
@@ -645,6 +695,7 @@ int getServerAddress(char *serverArgument, char *serverAddress)
                     // error invalid Ip
                     printf("Server switch Ip Address is INVALID!\n");
                     printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name or Ip address.\n");
+                    printf("Example: \"chat-client -userChris -server192.168.1.1\"\n");
                     return -4;
                 }
             }
@@ -659,6 +710,7 @@ int getServerAddress(char *serverArgument, char *serverAddress)
         {
             printf("No server name attached to the -server switch!\n");
             printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name or Ip address.\n");
+            printf("Example: \"chat-client -userChris -server192.168.1.1\"\n");
             return -2;
         }
     }
@@ -666,6 +718,7 @@ int getServerAddress(char *serverArgument, char *serverAddress)
     {
         printf("No -server switch!\n");
         printf("Usage: <arg1> <arg2> <arg3>\nWhere arg1 is the exe, arg2 is the user, arg3 is the server name or Ip address.\n");
+        printf("Example: \"chat-client -userChris -server192.168.1.1\"\n");
         return -3;
     }
 }
