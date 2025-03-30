@@ -369,8 +369,8 @@ void *handleReceivedMessage(void *arg)
                 int seconds = timeInfo->tm_sec;
                 char displayMessage[MAX_PROTOL_MESSAGE_SIZE + 20]; // extra space for plus sign and null terminator
                 // If the message is from the client, change the >> to <<
+                receiveBuffer[23] = '<';
                 receiveBuffer[24] = '<';
-                receiveBuffer[25] = '<';
 
                 // Format the message
                 snprintf(displayMessage, sizeof(displayMessage), "%s(%02d:%02d:%02d)", receiveBuffer, hours, minutes, seconds);
