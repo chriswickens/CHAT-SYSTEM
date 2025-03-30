@@ -1,48 +1,33 @@
-
-
 #include "../inc/chat-client.h"
 
-// some of these belong in the common.h file
-// #define SERVER_PORT 8888      // Port number of chat server
-// #define MAX_MESSAGE_SIZE 81   // Maximum length of a user-typed message
-// #define MAX_PROTOCOL_SIZE 128 // Buffer size for protocol messages
-// #define MAX_PART_LEN 40       // Maximum characters per message part
+// Global Socket
+// int socketFileDescriptor;
 
-int socketFileDescriptor;                                                                     // Global socket descriptor
-WINDOW *receivedMessagesWindow, *boxMsgWindow, *userInputWindow, *receivedTitle, *inputTitle; // ncurses windows for chat display and input
-char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];                                                  // Buffer for incoming messages
+// Ncurses Windows                                                                    
+WINDOW *receivedMessagesWindow, 
+*boxMsgWindow, 
+*userInputWindow, 
+*receivedTitle, 
+*inputTitle;
 
-char clientIP[256]; // Stores the client's IP address
+// Buffer for received messages
+char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];
 
-// Function prototypes
-// These belong in the chat-client.h file
+// Store client address
+char clientIP[256];
 
-// SOME FUNCTION PROTOTYPES ARE MISSING!
-void initializeNcursesWindows(void);
-int connectToServer(const char *serverIpAddress);
-void *handleReceivedMessage(void *arg);
-int startReceivingThread(void);
-void handleUserInput(char *userName, char *clientIP);
-void cleanup(void);
-void getLocalIP(char *ipBuffer, size_t bufferSize);
-void splitMessage(const char *fullString, char *firstPart, char *secondPart);
-void checkHostName(int hostname);
-void checkHostEntryDetails(struct hostent *hostentry);
-void ipAddressFormatter(char *IPbuffer);
-void sendProtocolMessage(const char *message);
-void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int userInputIndex);
 
 void getLocalIP(char *ipBuffer, size_t bufferSize)
 {
-    // (void)socketDescriptor; // Not used in this implementation.
-    struct ifaddrs *ifAddress, *ifa;
-    if (getifaddrs(&ifAddress) == -1)
+    struct ifaddrs *interfaceAddress, *ifa;
+    if (getifaddrs(&interfaceAddress) == -1)
     {
         strncpy(ipBuffer, "0.0.0.0", bufferSize);
         return;
     }
+
     // Iterate through available network interfaces
-    for (ifa = ifAddress; ifa != NULL; ifa = ifa->ifa_next)
+    for (ifa = interfaceAddress; ifa != NULL; ifa = ifa->ifa_next)
     {
         if (ifa->ifa_addr == NULL)
         {
@@ -60,13 +45,13 @@ void getLocalIP(char *ipBuffer, size_t bufferSize)
 
             struct sockaddr_in *socketAddress = (struct sockaddr_in *)ifa->ifa_addr;
             inet_ntop(AF_INET, &socketAddress->sin_addr, ipBuffer, bufferSize);
-            freeifaddrs(ifAddress);
+            freeifaddrs(interfaceAddress);
             return;
         }
     }
 
     // Free the memory
-    freeifaddrs(ifAddress);
+    freeifaddrs(interfaceAddress);
     strncpy(ipBuffer, "0.0.0.0", bufferSize);
 }
 
@@ -278,14 +263,14 @@ void initializeNcursesWindows(void)
     wrefresh(userInputWindow); // Refresh the input window to update the cursor position
 }
 
-int connectToServer(const char *serverIpAddress)
+int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
 {
     // Setup a struct to hold the socket info
     struct sockaddr_in serverAddress;
 
     // Setup the socket using IPv4
-    socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
-    if (socketFileDescriptor < 0)
+    *socketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+    if (*socketFileDescriptor < 0)
     {
         return -1;
     }
@@ -298,10 +283,10 @@ int connectToServer(const char *serverIpAddress)
     localAddr.sin_port = 0;
 
     // Bind the client socket
-    if (bind(socketFileDescriptor, (struct sockaddr *)&localAddr, sizeof(localAddr)) < 0)
+    if (bind(*socketFileDescriptor, (struct sockaddr *)&localAddr, sizeof(localAddr)) < 0)
     {
         perror("bind failed");
-        close(socketFileDescriptor);
+        close(*socketFileDescriptor);
         return -1;
     }
 
@@ -322,9 +307,9 @@ int connectToServer(const char *serverIpAddress)
     }
 
     // Connect
-    if (connect(socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
+    if (connect(*socketFileDescriptor, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
-        close(socketFileDescriptor);
+        close(*socketFileDescriptor);
         printf("ERROR CONNECTING TO SERVER!!\n\n");
         return -1;
     }
@@ -336,7 +321,8 @@ int connectToServer(const char *serverIpAddress)
 
 void *handleReceivedMessage(void *arg)
 {
-    (void)arg; // Not using the argument
+    // (void)arg; // Not using the argument
+    int socketFileDescriptor = *((int *)arg);
 
     // Keep checking for messages in this loop
     while (1)
@@ -427,13 +413,13 @@ void *handleReceivedMessage(void *arg)
     return NULL;
 }
 
-int startReceivingThread()
+int startReceivingThread(int *socketFileDescriptor)
 {
     // The thread
     pthread_t receivingThread;
 
     // Start the thread using the handleReceivedMessage() function
-    if (pthread_create(&receivingThread, NULL, handleReceivedMessage, NULL) != 0)
+    if (pthread_create(&receivingThread, NULL, handleReceivedMessage, socketFileDescriptor) != 0)
     {
         return -1;
     }
@@ -443,7 +429,7 @@ int startReceivingThread()
     return 0;
 }
 
-void sendProtocolMessage(const char *message)
+void sendProtocolMessage(const char *message, int socketFileDescriptor)
 {
     // Get the length of the message
     int len = strlen(message);
@@ -457,7 +443,7 @@ void sendProtocolMessage(const char *message)
     }
 }
 
-void handleUserInput(char *clientName, char *clientIP)
+void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor)
 {
     // clientIP is now available to send to the server or to be used to verify the broadcast.
     char sendBuffer[CLIENT_MAX_MSG_SIZE] = {0};
@@ -490,7 +476,7 @@ void handleUserInput(char *clientName, char *clientIP)
             {
                 // Send a single message
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|0|%s", clientIP, clientName, sendBuffer);
-                sendProtocolMessage(protocolMsg);
+                sendProtocolMessage(protocolMsg, *socketFileDescriptor);
             }
 
             // Otherwise split the message and send both parts
@@ -499,12 +485,12 @@ void handleUserInput(char *clientName, char *clientIP)
                 // Split the message into two parts.
                 splitMessage(sendBuffer, messagePartOne, messagePartTwo);
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|1|%s", clientIP, clientName, messagePartOne);
-                sendProtocolMessage(protocolMsg);
+                sendProtocolMessage(protocolMsg, *socketFileDescriptor);
 
                 // Small delay to give the first message time to arrive
                 usleep(50000);
                 snprintf(protocolMsg, sizeof(protocolMsg), "%s|%s|2|%s", clientIP, clientName, messagePartTwo);
-                sendProtocolMessage(protocolMsg);
+                sendProtocolMessage(protocolMsg, *socketFileDescriptor);
             }
 
             // Clear the input
@@ -543,10 +529,10 @@ void handleUserInput(char *clientName, char *clientIP)
     }
 }
 
-void cleanup()
+void cleanup(int *socketFileDescriptor)
 {
     // Close the socket, delete the windows
-    close(socketFileDescriptor);
+    close(*socketFileDescriptor);
     delwin(receivedMessagesWindow);
     delwin(userInputWindow);
     delwin(inputTitle);
@@ -687,6 +673,7 @@ int main(int argc, char *argv[])
 
     char userName[6];
     char serverName[256] = "Ip address used";
+    int socketFileDescriptor;
     // char serverIp[17] = "Server name used";
 
     // Check if arg count is valid
@@ -713,16 +700,14 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-
     // Attempt to connect to the server
-    if (connectToServer(serverName) < 0)
+    if (connectToServer(serverName, &socketFileDescriptor) < 0)
     {
         // wprintw(receivedMessagesWindow, "Connect failed: %s\n", strerror(errno));
         // wrefresh(receivedMessagesWindow);
-        cleanup();
+        cleanup(&socketFileDescriptor);
         exit(EXIT_FAILURE);
     }
-
 
     // Initialize the ncurses windows
     initializeNcursesWindows();
@@ -731,8 +716,8 @@ int main(int argc, char *argv[])
     // wprintw(receivedMessagesWindow, "CLIENT IP: %s\n", clientIP);
     // wprintw(receivedMessagesWindow, "Server : %s\n", serverName);
     // wrefresh(receivedMessagesWindow);
-    startReceivingThread();
-    handleUserInput(userName, clientIP);
-    cleanup();
+    startReceivingThread(&socketFileDescriptor);
+    handleUserInput(userName, clientIP, &socketFileDescriptor);
+    cleanup(&socketFileDescriptor);
     return 0;
 }

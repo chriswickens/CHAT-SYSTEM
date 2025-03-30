@@ -22,7 +22,4 @@
 
 #define MAX_PROTOL_MESSAGE_SIZE 128
 
-// Titles
-#define CHAT_TITLE "============= Received Messages ============="
-
 #endif
