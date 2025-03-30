@@ -16,7 +16,16 @@ char receiveBuffer[MAX_PROTOL_MESSAGE_SIZE];
 // Store client address
 char clientIP[256];
 
-
+/*
+* FUNCTION : getLocalIP
+*
+* DESCRIPTION : This function gets the clients local IP address for
+*
+* PARAMETERS : char *ipBuffer : Buffer to store the IP address.
+*              size_t bufferSize : Size of the ipBuffer.
+*
+* RETURNS : void
+*/
 void getLocalIP(char *ipBuffer, size_t bufferSize)
 {
     struct ifaddrs *interfaceAddress, *ifa;
@@ -55,6 +64,18 @@ void getLocalIP(char *ipBuffer, size_t bufferSize)
     strncpy(ipBuffer, "0.0.0.0", bufferSize);
 }
 
+/*
+* FUNCTION : splitMessage
+*
+* DESCRIPTION : This function splits a message into two parts if the message is longer than 40 characters
+* It will try to do in a graceful way if possible
+*
+* PARAMETERS : const char *fullString : The full message to split.
+*              char *firstPart : Buffer to store the first part of the message.
+*              char *secondPart : Buffer to store the second part of the message.
+*
+* RETURNS : void
+*/
 void splitMessage(const char *fullString, char *firstPart, char *secondPart)
 {
     int fullStringLength = strlen(fullString);
@@ -171,6 +192,15 @@ void splitMessage(const char *fullString, char *firstPart, char *secondPart)
     }
 }
 
+/*
+* FUNCTION : initializeNcursesWindows
+*
+* DESCRIPTION : This function sets up the ncurses windows to display incoming and outgoing messages nicely
+*
+* PARAMETERS : None
+*
+* RETURNS : void
+*/
 void initializeNcursesWindows(void)
 {
     initscr();
@@ -263,6 +293,16 @@ void initializeNcursesWindows(void)
     wrefresh(userInputWindow); // Refresh the input window to update the cursor position
 }
 
+/*
+* FUNCTION : connectToServer
+*
+* DESCRIPTION : This function creates a socket, binds it to a port, and connects to the server
+*
+* PARAMETERS : const char *serverIpAddress : The server IP address as a string.
+*              int *socketFileDescriptor : Pointer to an integer to store the created socket file descriptor.
+*
+* RETURNS : int : 0 on success, -1 on error.
+*/
 int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
 {
     // Setup a struct to hold the socket info
@@ -319,6 +359,16 @@ int connectToServer(const char *serverIpAddress, int *socketFileDescriptor)
     return 0;
 }
 
+/*
+* FUNCTION : handleReceivedMessage
+*
+* DESCRIPTION : This function runs in a separate thread to keep checking for messages from the chat server
+* Messages are displayed using ncurses
+*
+* PARAMETERS : void *arg : Pointer to the socket file descriptor (cast to int *).
+*
+* RETURNS : void * : Always returns NULL.
+*/
 void *handleReceivedMessage(void *arg)
 {
     // (void)arg; // Not using the argument
@@ -413,6 +463,15 @@ void *handleReceivedMessage(void *arg)
     return NULL;
 }
 
+/*
+* FUNCTION : startReceivingThread
+*
+* DESCRIPTION : This function starts a thread that runs handleReceivedMessage to get messages from the server
+*
+* PARAMETERS : int *socketFileDescriptor : Pointer to the socket file descriptor.
+*
+* RETURNS : int : 0 on success, -1 on error.
+*/
 int startReceivingThread(int *socketFileDescriptor)
 {
     // The thread
@@ -429,6 +488,16 @@ int startReceivingThread(int *socketFileDescriptor)
     return 0;
 }
 
+/*
+* FUNCTION : sendProtocolMessage
+*
+* DESCRIPTION : This function sends a formatted message to the server
+*
+* PARAMETERS : const char *message : The message to send.
+*              int socketFileDescriptor : The socket file descriptor to use for sending.
+*
+* RETURNS : void
+*/
 void sendProtocolMessage(const char *message, int socketFileDescriptor)
 {
     // Get the length of the message
@@ -443,6 +512,17 @@ void sendProtocolMessage(const char *message, int socketFileDescriptor)
     }
 }
 
+/*
+* FUNCTION : handleUserInput
+*
+* DESCRIPTION : This function handles user input from the ncurses window, and sends messages it to the server
+*
+* PARAMETERS : char *clientName : The name of the client.
+*              char *clientIP : The IP address of the client.
+*              int *socketFileDescriptor : Pointer to the socket file descriptor.
+*
+* RETURNS : void
+*/
 void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor)
 {
     // clientIP is now available to send to the server or to be used to verify the broadcast.
@@ -529,6 +609,15 @@ void handleUserInput(char *clientName, char *clientIP, int *socketFileDescriptor
     }
 }
 
+/*
+* FUNCTION : cleanup
+*
+* DESCRIPTION : Closes all the ncurses windows and closes the socket
+*
+* PARAMETERS : int *socketFileDescriptor : Pointer to the socket file descriptor to close.
+*
+* RETURNS : void
+*/
 void cleanup(int *socketFileDescriptor)
 {
     // Close the socket, delete the windows
@@ -540,45 +629,16 @@ void cleanup(int *socketFileDescriptor)
     endwin();
 }
 
-// void checkHostName(int hostname)
-// { // This function returns host name for local computer
-//     if (hostname == -1)
-//     {
-//         perror("gethostname");
-//         exit(1);
-//     }
-// }
-
-// void checkHostEntryDetails(struct hostent *hostentry)
-// { // find host info from host name
-//     if (hostentry == NULL)
-//     {
-//         perror("gethostbyname");
-//         exit(1);
-//     }
-// }
-
-// void ipAddressFormatter(char *IPbuffer)
-// { // convert IP string to dotted decimal format
-//     if (NULL == IPbuffer)
-//     {
-//         perror("inet_ntoa");
-//         exit(1);
-//     }
-// }
-
-// void updateUserInputWindow(WINDOW *inputWin, const char *currentBuffer, int userInputIndex)
-// {
-//     werase(inputWin);
-//     box(inputWin, 0, 0);
-//     // Print the input marker and current user input
-//     mvwprintw(inputWin, 1, 1, "%s %s", CLIENT_INPUT_MARKER, currentBuffer);
-//     // Move the cursor to the appropriate position (adjust the coordinates as needed)
-//     wmove(inputWin, 1, 3 + userInputIndex);
-//     wrefresh(inputWin);
-// }
-int getUserName(char *userArg, char* userName);
-
+/*
+* FUNCTION : getUserName
+*
+* DESCRIPTION : This function parses the user name from the command line arguments
+*
+* PARAMETERS : char *userArg : The argument string containing the user name (prefixed with "-user").
+*              char *userName : Buffer to store the extracted user name.
+*
+* RETURNS : int : 1 on success, -1 on error.
+*/
 int getUserName(char *userArg, char* userName)
 {
     // Check for username switch
@@ -615,7 +675,16 @@ int getUserName(char *userArg, char* userName)
     }
 }
 
-int getServerAddress(char *serverArgument, char *serverAddress);
+/*
+* FUNCTION : getServerAddress
+*
+* DESCRIPTION : This function parses the server address from the command line arguments
+*
+* PARAMETERS : char *serverArgument : The argument string containing the server address (prefixed with "-server").
+*              char *serverAddress : Buffer to store the extracted server address.
+*
+* RETURNS : int : 1 on success, or a negative error code on error.
+*/
 int getServerAddress(char *serverArgument, char *serverAddress)
 {
     if (strstr(serverArgument, "-server") != NULL)
@@ -667,6 +736,7 @@ int getServerAddress(char *serverArgument, char *serverAddress)
         return -3;
     }
 }
+
 
 int main(int argc, char *argv[])
 {
